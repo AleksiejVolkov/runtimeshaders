@@ -2,8 +2,9 @@
 Welcome to the Shader Experiments Repository! This repository is dedicated to various shader experiments, with each experiment hosted in its own branch. The main branch contains only the basic initial setup, serving as the foundation for all shader experiments.
 
 ## Structure
-main: The main branch contains the very basic initial setup. It serves as the foundation for all shader experiments. You can use this setup to start your own experiments or to explore the different branches.
-Experiment Branches: Each shader experiment is contained within its own branch. This structure allows for isolated development and testing of individual shader effects.
+*main*: The main branch contains the very basic initial setup. It serves as the foundation for all shader experiments. You can use this setup to start your own experiments or to explore the different branches.
+
+*Experiment Branches*: Each shader experiment is contained within its own branch. This structure allows for isolated development and testing of individual shader effects.
 
 ## How to Use
 
