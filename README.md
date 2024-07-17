@@ -58,11 +58,11 @@ git push origin my-new-shader-experiment
 ### Contributing
 Contributions are welcome! If you have a shader experiment you’d like to share, please follow the steps above to create a new branch and submit a pull request.
 
-Fork the repository
-Create your feature branch (`git checkout -b feature/shader-experiment`)
-Commit your changes (`git commit -m 'Add some shader experiment'`)
-Push to the branch (`git push origin feature/shader-experiment`)
-Open a pull request
+- Fork the repository
+- Create your feature branch (`git checkout -b feature/shader-experiment`)
+- Commit your changes (`git commit -m 'Add some shader experiment'`)
+- Push to the branch (`git push origin feature/shader-experiment`)
+- Open a pull request
 
 ## License
 This repository is licensed under the MIT License.
