@@ -38,32 +38,41 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             RuntimeShadersTheme {
-                Box(
-                    modifier = Modifier
-                        .background(Color.White)
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var percentage by remember {
-                        mutableFloatStateOf(0.0f)
-                    }
-
-                    val percentageAnim = animateFloatAsState(targetValue = percentage, label = "")
-
-                    ShaderView(
-                        modifier = Modifier
-                            .clipToBounds()
-                            .clickable {
-                                percentage = if (percentage == 0.0f) 1.0f else 0.0f
-                            },
-                        content = {
-                            Text(text = "Hello, World!", color = Color.Black, fontSize = 24.sp)
-                        },
-                        percentage = percentageAnim.value
-                    )
-                }
+                ActivityContent()
             }
         }
+    }
+}
+
+@Composable
+fun ActivityContent() {
+    Box(
+        modifier = Modifier
+            .background(Color.White)
+            .fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        var percentage by remember {
+            mutableFloatStateOf(0.0f)
+        }
+
+        val percentageAnim = animateFloatAsState(
+            targetValue = percentage,
+            label = "")
+
+        ShaderView(
+            modifier = Modifier
+                .clipToBounds()
+                .clickable {
+                    percentage = if (percentage == 0.0f) 1.0f else 0.0f
+                },
+            content = {
+                Text(text = "Hello, World!",
+                    color = Color.Black,
+                    fontSize = 24.sp)
+            },
+            percentage = percentageAnim.value
+        )
     }
 }
 
