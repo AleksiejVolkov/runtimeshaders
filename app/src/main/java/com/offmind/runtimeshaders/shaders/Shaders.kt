@@ -53,3 +53,33 @@ val initial_shader = Uniforms + Functions + """
        }
 """.trimIndent()
 
+val mask_shader = Uniforms + Functions + """
+       uniform shader mask;
+       uniform shader origin;
+       uniform float2 originSize;
+       uniform float2 maskSize;
+       uniform float percentage;
+       
+       vec4 GetImageTextureMask(in vec2 p, vec2 pivot) {
+            p.y /= resolution.y / resolution.x;
+            p+=pivot;
+            p*=resolution;
+            return origin.eval(p);
+       }   
+       
+       vec4 main(float2 fragCoord) {
+            float2 uv = fragCoord / resolution - 0.5;
+            uv.y *= resolution.y / resolution.x;
+            
+            vec4 col = GetImageTexture(uv, vec2(0.5, 0.5));
+            vec4 mask = mask.eval(fragCoord*originSize/resolution);
+            vec4 origin = origin.eval(fragCoord*originSize/resolution);
+            
+            col.rgb *= 1.0-(percentage*0.3);
+            
+            vec3 final = mix(col.rgb,origin.rgb,mask.a*percentage);
+            
+            return vec4(final, 1.0);
+       }
+""".trimIndent()
+
