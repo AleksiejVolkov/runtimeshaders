@@ -1,14 +1,10 @@
 package com.offmind.runtimeshaders
 
-import android.graphics.ColorFilter
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
-import android.health.connect.datatypes.units.Percentage
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -46,7 +40,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.offmind.runtimeshaders.composables.provideTimeAsState
-import com.offmind.runtimeshaders.shaders.initial_shader
+import com.offmind.runtimeshaders.shaders.Shader
+import com.offmind.runtimeshaders.shaders.Uniform
+import com.offmind.runtimeshaders.shaders.addUniform
+import com.offmind.runtimeshaders.shaders.basicUniformList
+import com.offmind.runtimeshaders.shaders.shockwave
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -105,8 +103,16 @@ fun ShaderView(
     content: @Composable () -> Unit = {}
 ) {
     val shader by remember {
-        mutableStateOf(RuntimeShader(initial_shader))
+        mutableStateOf(
+            RuntimeShader(
+                Shader(shockwave).getRawShader(
+                    basicUniformList
+                        .addUniform(Uniform.Type.VEC2 to "pointer")
+                )
+            )
+        )
     }
+
     val time by provideTimeAsState(Random.nextFloat() * 10f)
 
     Box(modifier = modifier
@@ -168,7 +174,6 @@ fun SampleContent(
         }
     }
 }
-
 
 @Composable
 fun LoginForm() {
