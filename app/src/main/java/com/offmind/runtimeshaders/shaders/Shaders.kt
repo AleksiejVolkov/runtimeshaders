@@ -71,13 +71,12 @@ val mask_shader = Uniforms + Functions + """
             float2 uv = fragCoord / resolution - 0.5;
             uv.y *= resolution.y / resolution.x;
             
-            vec4 col = GetImageTexture(uv, vec2(0.5, 0.5));
+            vec4 blured = GetImageTexture(uv, vec2(0.5, 0.5));
             vec4 mask = mask.eval(fragCoord*originSize/resolution);
             vec4 origin = origin.eval(fragCoord*originSize/resolution);
-            
-            col.rgb *= 1.0-(percentage*0.3);
-            
-            vec3 final = mix(col.rgb,origin.rgb,mask.a*percentage);
+      
+            blured.rgb *= 0.7;
+            vec3 final= mix(origin.rgb,blured.rgb,percentage*(1.0-mask.a));
             
             return vec4(final, 1.0);
        }
