@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.shaders
 
+//TODO add a way to return already compiled runtimeShader with time and resolution
 class Shader(private val shaderCode: String) {
     private val functions = """
         $GetViewTextureFunction
@@ -34,6 +35,18 @@ data class Uniform(
     }
 }
 
+/**
+ * A list of the most common uniforms used in almost every shader.
+ *
+ * This list includes:
+ * - `image`: A shader uniform of type `SHADER`.
+ * - `resolution`: A shader uniform of type `VEC2`.
+ * - `time`: A shader uniform of type `FLOAT`.
+ * - `percentage`: A shader uniform of type `FLOAT`. This uniform is used to control the progress of an animation. Normally would be between 0 and 1
+ *
+ * You can remove any of these uniforms if needed by using the extension function `removeUniform`.
+ * Additionally, new uniforms can be added to this list for a specific shader by calling the `addUniform` extension function.
+ */
 val basicUniformList = listOf(
     Uniform(Uniform.Type.SHADER, "image"),
     Uniform(Uniform.Type.VEC2, "resolution"),
