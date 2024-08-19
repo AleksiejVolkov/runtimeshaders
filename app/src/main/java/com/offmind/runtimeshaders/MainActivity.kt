@@ -5,17 +5,22 @@ import android.graphics.RuntimeShader
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -31,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -55,16 +61,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             var pointerPos by remember { mutableStateOf(Offset.Zero) }
-            var percentage by remember { mutableFloatStateOf(0.0f) }
+            var percentage by remember { mutableFloatStateOf(1f) }
             var animate by remember { mutableStateOf(false) }
 
             LaunchedEffect(animate) {
                 if (animate) {
                     percentage = 0f
-                   while (percentage < 1f) {
-                       percentage += 0.01f
-                       delay(3)
-                   }
+                    while (percentage < 1f) {
+                        percentage += 0.01f
+                        delay(3)
+                    }
                     animate = false
                 }
             }
@@ -80,12 +86,10 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .clipToBounds(),
-                        pointerPos = pointerPos,
                         percentage = percentage,
                         content = {
-                            SampleContent { pos ->
-                                pointerPos = pos
-                                animate = true
+                            SampleContent { success ->
+                                animate = !success
                             }
                         }
                     )
@@ -104,11 +108,9 @@ fun ShaderView(
 ) {
     val shader by remember {
         mutableStateOf(
-            RuntimeShader(
-                Shader(shockwave).getRawShader(
-                    basicUniformList
-                        .addUniform(Uniform.Type.VEC2 to "pointer")
-                )
+            Shader(shockwave).getRuntimeShader(
+                basicUniformList
+                    .addUniform(Uniform.Type.VEC2 to "pointer")
             )
         )
     }
@@ -139,46 +141,75 @@ fun ShaderView(
         {
             content()
         }
-
     }
 }
 
 @Composable
 fun SampleContent(
-    onTouched: (pos: Offset) -> Unit = {}
+    onLogin: (success: Boolean) -> Unit = {}
 ) {
-    Box( modifier = Modifier
-        .fillMaxSize()
-        .pointerInput(Unit) {
-            this.awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val position = event.changes.first().position
-                    onTouched(position)
-                }
-            }
-        },
-        contentAlignment = Alignment.Center) {
+    var visib by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         Image(
-           painter = painterResource(id = R.drawable.generic_mountians),
-           contentDescription = "Sample Image",
-           contentScale = ContentScale.Crop,
-           modifier = Modifier.fillMaxSize()
-       )
+            painter = painterResource(id = R.drawable.generic_mountians),
+            contentDescription = "Sample Image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
         Column(
             modifier = Modifier
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp)
+                .background(shape = CircleShape, color = Color.White)
+                .clickable { onLogin(false) },
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+
         ) {
-            LoginForm()
+            Image(
+                painter = painterResource(id = R.drawable.launcher_fg),
+                contentDescription = "Sample Image",
+                contentScale = ContentScale.Crop,
+                colorFilter = ColorFilter.tint(Color.DarkGray),
+                modifier = Modifier.size(200.dp)
+            )
+            /*AnimatedVisibility(!visib) {
+                LoginForm { success ->
+                    visib = success
+                 //   onLogin(success)
+                }
+            }*/
         }
     }
 }
 
 @Composable
-fun LoginForm() {
+fun LoginForm(
+    onLogin: (success: Boolean) -> Unit = {}
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    var error: String? by remember { mutableStateOf(null) }
+    var success: Boolean by remember { mutableStateOf(false) }
+    var loading: Boolean by remember { mutableStateOf(false) }
+    var steps by remember { mutableStateOf(0) }
+
+    LaunchedEffect(loading) {
+        if (loading) {
+            delay(2300)
+            onLogin(steps == 3)
+            loading = false
+            if (steps == 3) {
+                success = true
+            } else {
+                error = "Invalid username or password"
+            }
+        }
+    }
 
     Card(
         modifier = Modifier
@@ -186,6 +217,7 @@ fun LoginForm() {
             .padding(16.dp),
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
+
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -199,7 +231,8 @@ fun LoginForm() {
                 value = username,
                 onValueChange = { username = it },
                 label = { Text(text = "Username") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = error != null
             )
 
             OutlinedTextField(
@@ -207,14 +240,26 @@ fun LoginForm() {
                 onValueChange = { password = it },
                 label = { Text(text = "Password") },
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = error != null
             )
 
             Button(
-                onClick = { /* Handle login logic */ },
-                modifier = Modifier.fillMaxWidth()
+                onClick = {
+                    steps++
+                    loading = true
+                    error = null
+
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading
             ) {
-                Text(text = "Login")
+                if (loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else
+                    Text(text = "Login")
             }
         }
     }

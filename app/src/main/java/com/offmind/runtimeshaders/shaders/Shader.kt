@@ -1,21 +1,56 @@
 package com.offmind.runtimeshaders.shaders
 
-//TODO add a way to return already compiled runtimeShader with time and resolution
-class Shader(private val shaderCode: String) {
-    private val functions = """
-        $GetViewTextureFunction
-        $ChromaticAberrationFunction
-        $CircleSDFFunction
-""".trimIndent()
+import android.graphics.RuntimeShader
+import com.offmind.runtimeshaders.generated.ShaderDependencyMap
+import com.offmind.runtimeshaders.generated.ShaderFunction
 
-    fun getRawShader(uniforms: List<Uniform> = basicUniformList): String {
-        return uniformsToString(uniforms) + functions + shaderCode
+class Shader(private val shaderCode: String) {
+    private val allFunctions = ShaderDependencyMap.functions
+
+    private fun getRawShader(uniforms: List<Uniform> = basicUniformList): String {
+        val resolvedFunctions = mutableSetOf<ShaderFunction>()
+
+        for (function in allFunctions.keys) {
+            resolveDependencies(function, resolvedFunctions, mutableSetOf())
+        }
+
+        val functionsCode = resolvedFunctions.map { allFunctions[it] }.joinToString("\n\n")
+
+        return uniformsToString(uniforms) + functionsCode + shaderCode
+    }
+
+    fun getRuntimeShader(uniforms: List<Uniform> = basicUniformList): RuntimeShader {
+        return RuntimeShader(getRawShader(uniforms))
     }
 
     private fun uniformsToString(uniforms: List<Uniform>): String {
         return uniforms.joinToString(separator = "") {
             "uniform ${it.type.value} ${it.name};\n"
         }
+    }
+
+    private fun resolveDependencies(
+        function: ShaderFunction,
+        resolved: MutableSet<ShaderFunction>,
+        unresolved: MutableSet<ShaderFunction>
+    ): List<ShaderFunction> {
+        unresolved.add(function)
+
+        val dependencies = ShaderDependencyMap.dependencies[function] ?: emptyList()
+
+        for (dependency in dependencies) {
+            if (!resolved.contains(dependency)) {
+                if (unresolved.contains(dependency)) {
+                    throw IllegalArgumentException("Circular dependency detected: ${function.value} -> $dependency")
+                }
+                resolveDependencies(dependency, resolved, unresolved)
+            }
+        }
+
+        unresolved.remove(function)
+        resolved.add(function)
+
+        return resolved.toList()
     }
 }
 
