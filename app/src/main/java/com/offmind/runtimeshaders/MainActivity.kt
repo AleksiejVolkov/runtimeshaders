@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,16 +67,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             var pointerPos by remember { mutableStateOf(Offset.Zero) }
             var percentage by remember { mutableFloatStateOf(1f) }
-            var animate by remember { mutableStateOf(false) }
 
-            LaunchedEffect(animate) {
-                if (animate) {
-                    percentage = 0f
-                    while (percentage < 1f) {
-                        percentage += 0.01f
-                        delay(3)
-                    }
-                    animate = false
+            LaunchedEffect(pointerPos) {
+                percentage = 0f
+                while (percentage < 1f) {
+                    percentage += 0.01f
+                    delay(5)
                 }
             }
 
@@ -83,24 +80,40 @@ class MainActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.background)
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            while (true) {
+                                val position = this.awaitPointerEventScope {
+                                    awaitFirstDown().position
+                                }
+                                pointerPos = position
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.generic_mountians),
-                        contentDescription = "Sample Image",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
 
-                    val shader = remember { Shader(chromaticAberrationEffect).getRuntimeShader() }
+
+                    val shader = remember {
+                        Shader(shockwave).getRuntimeShader(
+                            uniforms =
+                            basicUniformList.addUniform(Uniform.Type.VEC2 to "pointer"),
+                        )
+                    }
                     ShadedBox(
                         modifier = Modifier.fillMaxSize(),
                         shader = shader,
                         shaderUniforms = mapOf(
                             "time" to ShaderTypedValue.FloatType(provideTimeAsState().value),
+                            "pointer" to ShaderTypedValue.Vec2Type(pointerPos.x, pointerPos.y),
+                            "percentage" to ShaderTypedValue.FloatType(percentage)
                         )
                     ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.generic_mountians),
+                            contentDescription = "Sample Image",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
                         SampleContent()
                     }
                 }
