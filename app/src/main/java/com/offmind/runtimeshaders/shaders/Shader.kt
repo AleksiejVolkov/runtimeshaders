@@ -5,7 +5,11 @@ import com.offmind.runtimeshaders.generated.ShaderDependencyMap
 import com.offmind.runtimeshaders.generated.ShaderFunction
 
 class Shader(private val shaderCode: String) {
-    private val allFunctions = ShaderDependencyMap.functions
+
+    fun getRuntimeShader(
+        uniforms: List<Uniform> = basicUniformList,
+        customFunctions: Set<ShaderFunction> = ShaderDependencyMap.functions.keys
+    ): RuntimeShader = RuntimeShader(getRawShader(uniforms, customFunctions))
 
     private fun getRawShader(
         uniforms: List<Uniform> = basicUniformList,
@@ -17,16 +21,11 @@ class Shader(private val shaderCode: String) {
             resolveDependencies(function, resolvedFunctions, mutableSetOf())
         }
 
-        val functionsCode = resolvedFunctions.map { allFunctions[it] }.joinToString("\n\n")
+        val functionsCode = resolvedFunctions
+            .map { ShaderDependencyMap.functions[it] }
+            .joinToString("\n\n")
 
         return uniformsToString(uniforms) + functionsCode + shaderCode
-    }
-
-    fun getRuntimeShader(
-        uniforms: List<Uniform> = basicUniformList,
-        customFunctions: Set<ShaderFunction> = allFunctions.keys
-    ): RuntimeShader {
-        return RuntimeShader(getRawShader(uniforms, customFunctions))
     }
 
     private fun uniformsToString(uniforms: List<Uniform>): String {
@@ -47,7 +46,9 @@ class Shader(private val shaderCode: String) {
         for (dependency in dependencies) {
             if (!resolved.contains(dependency)) {
                 if (unresolved.contains(dependency)) {
-                    throw IllegalArgumentException("Circular dependency detected: ${function.value} -> $dependency")
+                    throw IllegalArgumentException(
+                        "Circular dependency detected: ${function.value} -> $dependency"
+                    )
                 }
                 resolveDependencies(dependency, resolved, unresolved)
             }
@@ -102,4 +103,12 @@ fun List<Uniform>.removeUniform(name: String): List<Uniform> {
 fun List<Uniform>.addUniform(uniform: Pair<Uniform.Type, String>): List<Uniform> {
     assert(this.none { it.name == uniform.second }) { "Uniform with name ${uniform.second} already exists" }
     return this + Uniform(uniform.first, uniform.second)
+}
+
+
+sealed class ShaderTypedValue() {
+    data class FloatType(val value: Float): ShaderTypedValue()
+    data class Vec2Type(val value1: Float, val value2: Float): ShaderTypedValue()
+    data class Vec3Type(val value1: Float, val value2: Float, val value3: Float): ShaderTypedValue()
+    data class Vec4Type(val value1: Float, val value2: Float, val value3: Float, val value4: Float): ShaderTypedValue()
 }
