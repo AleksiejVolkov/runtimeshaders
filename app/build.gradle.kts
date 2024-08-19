@@ -1,5 +1,5 @@
-import com.offmind.runtimeshaders.*
-import java.util.Locale
+import com.offmind.runtimeshaders.scripts.CREATE_DEPENDENCY_TASK_NAME
+import com.offmind.runtimeshaders.scripts.registerGenerateShaderFunctionsTask
 
 plugins {
     id("com.android.application")
@@ -52,12 +52,17 @@ android {
     }
 }
 
-dependencies {
+registerGenerateShaderFunctionsTask(tasks)
 
+tasks.named("preBuild") {
+    dependsOn(CREATE_DEPENDENCY_TASK_NAME)
+}
+
+dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -65,72 +70,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-}
-
-tasks.register("generateShaderDependencyMap") {
-    doLast {
-        fun extractDependencies(functionName: String, functionCode: String, functionNames: List<String>): List<String> {
-            val dependencies = mutableListOf<String>()
-            for (name in functionNames) {
-                if (name != functionName) { // Exclude the function itself
-                    val regex = Regex("\\b$name\\b")
-                    if (regex.containsMatchIn(functionCode)) {
-                        dependencies.add(name)
-                    }
-                }
-            }
-            return dependencies
-        }
-
-        fun generateDependencyMap(functions: Map<String, String>): Map<String, List<String>> {
-            val functionNames = functions.keys.toList()
-            val dependencyMap = mutableMapOf<String, List<String>>()
-
-            for ((functionName, functionCode) in functions) {
-                val dependencies = extractDependencies(functionName, functionCode, functionNames)
-                dependencyMap[functionName] = dependencies
-            }
-
-            return dependencyMap
-        }
-
-        val functionDependencies = generateDependencyMap(allFunctions)
-
-        val kotlinCode = """
-            package com.offmind.runtimeshaders.generated
-            
-            enum class ShaderFunction(val value: String) {
-                ${allFunctions.keys.joinToString(",\n") { "${it.uppercase(Locale.getDefault())}(\"$it\")" }}
-            }
-
-            object ShaderDependencyMap {
-                val dependencies: Map<ShaderFunction, List<ShaderFunction>> = mapOf(
-                    ${functionDependencies.entries.joinToString(",\n") {
-            "ShaderFunction.${it.key.uppercase(Locale.getDefault())} to listOf(${it.value.joinToString(", ") { "ShaderFunction.${it.uppercase(Locale.getDefault())}" }})"
-        }}
-                )
-                
-                val functions: Map<ShaderFunction, String> = mapOf(
-                    ${allFunctions.entries.joinToString(",\n") {
-            "ShaderFunction.${it.key.uppercase(Locale.getDefault())} to \"\"\"${it.value}\"\"\""
-        }}
-                )
-            }
-        """.trimIndent()
-
-        val outputDir = File("${project.buildDir}/generated/src/main/java/com/offmind/runtimeshaders/generated")
-        outputDir.mkdirs()
-        val outputFile = File(outputDir, "ShaderDependencyMap.kt")
-        outputFile.writeText(kotlinCode)
-
-        println("Kotlin file generated at ${outputFile.absolutePath}")
-    }
-}
-
-tasks.named("preBuild") {
-    dependsOn("generateShaderDependencyMap")
 }

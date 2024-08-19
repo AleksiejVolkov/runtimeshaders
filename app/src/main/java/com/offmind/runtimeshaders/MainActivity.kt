@@ -46,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.offmind.runtimeshaders.composables.provideTimeAsState
+import com.offmind.runtimeshaders.generated.ShaderDependencyMap
 import com.offmind.runtimeshaders.shaders.Shader
 import com.offmind.runtimeshaders.shaders.Uniform
 import com.offmind.runtimeshaders.shaders.addUniform
