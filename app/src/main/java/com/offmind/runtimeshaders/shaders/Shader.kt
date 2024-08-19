@@ -7,10 +7,13 @@ import com.offmind.runtimeshaders.generated.ShaderFunction
 class Shader(private val shaderCode: String) {
     private val allFunctions = ShaderDependencyMap.functions
 
-    private fun getRawShader(uniforms: List<Uniform> = basicUniformList): String {
+    private fun getRawShader(
+        uniforms: List<Uniform> = basicUniformList,
+        customFunctions: Set<ShaderFunction>
+    ): String {
         val resolvedFunctions = mutableSetOf<ShaderFunction>()
 
-        for (function in allFunctions.keys) {
+        for (function in customFunctions) {
             resolveDependencies(function, resolvedFunctions, mutableSetOf())
         }
 
@@ -19,8 +22,11 @@ class Shader(private val shaderCode: String) {
         return uniformsToString(uniforms) + functionsCode + shaderCode
     }
 
-    fun getRuntimeShader(uniforms: List<Uniform> = basicUniformList): RuntimeShader {
-        return RuntimeShader(getRawShader(uniforms))
+    fun getRuntimeShader(
+        uniforms: List<Uniform> = basicUniformList,
+        customFunctions: Set<ShaderFunction> = allFunctions.keys
+    ): RuntimeShader {
+        return RuntimeShader(getRawShader(uniforms, customFunctions))
     }
 
     private fun uniformsToString(uniforms: List<Uniform>): String {
