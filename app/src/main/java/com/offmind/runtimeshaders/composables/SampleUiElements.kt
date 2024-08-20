@@ -39,11 +39,10 @@ fun LoginForm(
     LaunchedEffect(loading) {
         if (loading) {
             delay(2300)
-            onLogin(steps == 3)
+            success = true
+            onLogin(success)
             loading = false
-            if (steps == 3) {
-                success = true
-            } else {
+            if (!success) {
                 error = "Invalid username or password"
             }
         }

@@ -33,7 +33,7 @@ val chromaticAberrationEffect = """
        vec4 main(float2 fragCoord) {
             float2 uv = NormalizeCoordinates(fragCoord, resolution);
           
-            float coef = 0.5;
+            float coef = percentage;
             float r = 0.17 * coef;
           
             vec4 image = GetImageTexture(uv, vec2(0.5, 0.5), resolution);
@@ -43,5 +43,27 @@ val chromaticAberrationEffect = """
             vec3 finalColor = mix(image.rgb, ripple, (1.-coef));
             
             return vec4(finalColor, image.a);
+       }
+""".trimIndent()
+
+val washDownToDisappear = """
+       vec4 main(float2 fragCoord) {
+            float2 uv = NormalizeCoordinates(fragCoord, resolution);
+            
+            float coef = percentage;
+            float r = 0.17 * coef;
+         
+            // Apply vertical distance based on the lower half of the screen
+            float vertical = smoothstep(0.0, .2, uv.y);
+            float random = vertical*0.2 + SNoise(vec2(uv.x, uv.x * .5)) * vertical;
+            
+            // Stretch effect: more movement at the bottom, less at the top
+            vec2 verticalDistance = vec2(0., uv.y) * coef * random;
+            vec4 image = GetImageTexture((uv - verticalDistance), vec2(0.5, 0.5), resolution);
+            
+            float alpha = (1.0 - coef);
+            alpha *= smoothstep(1., 0.4, uv.y);
+            vec3 finalColor = image.rgb*alpha;
+            return vec4(finalColor, image.a * alpha);
        }
 """.trimIndent()
