@@ -128,11 +128,97 @@ val NormalizeCoordinatesFunction = """
     }
 """.trimIndent()
 
+val DegreesToRadiansFunction = """
+    float DegreesToRadians(float degrees) {
+        return degrees * 0.0174533;
+    }
+""".trimIndent()
+
+val RadianToDegreesFunction = """
+    float RadiansToDegrees(float radians) {
+        return radians * 57.2958;
+    }
+""".trimIndent()
+
+/**
+ * A function that converts a color from RGB (Red, Green, Blue) to HSV (Hue, Saturation, Value).
+ *
+ * This function takes a `vec3` representing a color in RGB space and converts it to a `vec3` representing
+ * the same color in HSV space. The conversion is done using a series of mathematical operations to map
+ * the RGB components to their corresponding HSV values.
+ *
+ * @param c A `vec3` representing the color in RGB space, where:
+ *          - `c.x` is the red component (0.0 to 1.0),
+ *          - `c.y` is the green component (0.0 to 1.0),
+ *          - `c.z` is the blue component (0.0 to 1.0).
+ * @return A `vec3` representing the color in HSV space, where:
+ *          - `x` is the hue (0.0 to 1.0),
+ *          - `y` is the saturation (0.0 to 1.0),
+ *          - `z` is the value (0.0 to 1.0).
+ */
+val RotateMatrixFunction = """
+    vec2 rotateMatrix(vec2 p, vec2 pivot, float angle) {
+        // Translate the UV coordinates to the origin relative to the pivot
+        vec2 translated = p - pivot;
+
+        // Calculate the sine and cosine of the angle
+        float cosAngle = cos(angle);
+        float sinAngle = sin(angle);
+
+        // Perform the rotation
+        vec2 rotated;
+        rotated.x = translated.x * cosAngle - translated.y * sinAngle;
+        rotated.y = translated.x * sinAngle + translated.y * cosAngle;
+
+        // Translate the rotated UV coordinates back to the original position
+        rotated += pivot;
+
+        return rotated;
+    }
+""".trimIndent()
+
+val RGBToHSVFunction = """
+    vec3 RGBtoHSV(vec3 c) {
+        vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+        
+        float d = q.x - min(q.w, q.y);
+        float e = 1.0e-10;
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    }
+""".trimIndent()
+
+/**
+ * A function that converts a color from HSV (Hue, Saturation, Value) to RGB (Red, Green, Blue).
+ *
+ * This function takes a `vec3` representing a color in HSV space and converts it to a `vec3` representing
+ * the same color in RGB space. The conversion is done using a series of mathematical operations to map
+ * the HSV components to their corresponding RGB values.
+ *
+ * @param c A `vec3` representing the color in HSV space, where:
+ *          - `c.x` is the hue (0.0 to 1.0),
+ *          - `c.y` is the saturation (0.0 to 1.0),
+ *          - `c.z` is the value (0.0 to 1.0).
+ * @return A `vec3` representing the color in RGB space, where each component (r, g, b) is in the range [0.0, 1.0].
+ */
+val HSVToRgbFunction = """
+    vec3 HSVtoRGB(vec3 c) {
+        vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
+        return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+    }
+""".trimIndent()
+
 val allFunctions = mapOf(
     "CircleSDF" to CircleSDFFunction,
     "Hash21" to Hash21Function,
     "GetImageTexture" to GetViewTextureFunction,
     "SNoise" to SimplexNoiseFunction,
     "ChromaticAberration" to ChromaticAberrationFunction,
-    "NormalizeCoordinates" to NormalizeCoordinatesFunction
+    "NormalizeCoordinates" to NormalizeCoordinatesFunction,
+    "DegreesToRadians" to DegreesToRadiansFunction,
+    "RadiansToDegrees" to RadianToDegreesFunction,
+    "RotateMatrix" to RotateMatrixFunction,
+    "RGBtoHSV" to RGBToHSVFunction,
+    "HSVtoRGB" to HSVToRgbFunction
 )

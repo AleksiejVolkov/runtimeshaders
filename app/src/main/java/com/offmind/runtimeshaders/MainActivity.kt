@@ -3,7 +3,8 @@ package com.offmind.runtimeshaders
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.offmind.runtimeshaders.screens.WashDownViewScreen
+import androidx.compose.material3.Scaffold
+import com.offmind.runtimeshaders.screens.LampWithShadowScreen
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
 
 class MainActivity : ComponentActivity() {
@@ -12,7 +13,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             RuntimeShadersTheme {
-                WashDownViewScreen()
+                Scaffold { paddingValues ->
+                    LampWithShadowScreen(paddingValues)
+                }
             }
         }
     }

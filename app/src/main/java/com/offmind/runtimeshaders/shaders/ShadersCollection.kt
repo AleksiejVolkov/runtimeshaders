@@ -67,3 +67,50 @@ val washDownToDisappear = """
             return vec4(finalColor, image.a * alpha);
        }
 """.trimIndent()
+
+val lampWithShadowEffect = """
+    
+    vec3 GetSaturatedColor(vec3 origin, float saturation, float brightness) {
+        vec3 hsvColor = RGBtoHSV(origin);
+        
+        hsvColor.y = hsvColor.y * saturation; 
+        hsvColor.z = hsvColor.z * brightness; 
+        
+        return HSVtoRGB(hsvColor);
+    }
+    
+    vec4 main(float2 fragCoord) {
+        float2 uv = NormalizeCoordinates(fragCoord, resolution);
+        vec4 originColor = GetImageTexture(uv, vec2(0.5, 0.5), resolution);
+      
+        vec3 lightColor = vec3(.89,.89,0.75);
+        vec3 colorInShadow = GetSaturatedColor(originColor.rgb, 0.5, 0.4);
+        vec3 colorInLight = GetSaturatedColor(originColor.rgb, 1.5, 1.2);
+        
+        vec2 uvRotatedToLamp = rotateMatrix(uv, lampPosition, DegreesToRadians(-lampAngle));
+       
+        float lampVerticalDistance = (uvRotatedToLamp.y-lampPosition.y)*0.4;
+        float lampLightEdge = 0.5*lampWidth+lampVerticalDistance;
+        float lightMask = smoothstep(lampLightEdge,lampLightEdge*0.9,abs(uvRotatedToLamp.x-lampPosition.x))*step(lampPosition.y, uvRotatedToLamp.y);
+
+        vec2 angleToSliderLeftEdge = lampPosition-(seekBarPosition-vec2(0.5*sliderWidth,0.));
+        vec2 uvRotatedToSlider = rotateMatrix(uv, seekBarPosition, atan(angleToSliderLeftEdge.x,angleToSliderLeftEdge.y));
+        float shadow = smoothstep((uv.y-seekBarPosition.y)*0.1,0.0,(uvRotatedToSlider.x-seekBarPosition.x-0.5*sliderWidth));
+        
+        vec2 angleToSliderRightEdge = lampPosition-(seekBarPosition+vec2(0.5*sliderWidth,0.));
+        uvRotatedToSlider = rotateMatrix(uv, seekBarPosition, atan(angleToSliderRightEdge.x,angleToSliderRightEdge.y));
+        
+        shadow *= smoothstep(0.0,(uv.y-seekBarPosition.y)*0.1,(uvRotatedToSlider.x-seekBarPosition.x+0.5*sliderWidth));
+        shadow *= step(seekBarPosition.y, uv.y);
+        
+        lightMask *= 1.- shadow;
+        lightMask *= 0.3*percentage;
+        
+        lightMask *=1./(5.*length(lampPosition.y));
+        
+        float lampGlow = 1./(3.5*length(uvRotatedToLamp-lampPosition))*lightMask;
+      
+        vec3 finalColor = mix(colorInShadow, colorInLight, lightMask)+lampGlow*lightColor;
+        return vec4(finalColor, originColor.a);
+    }
+""".trimIndent()
