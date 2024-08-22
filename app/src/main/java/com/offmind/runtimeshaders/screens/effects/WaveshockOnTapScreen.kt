@@ -1,4 +1,4 @@
-package com.offmind.runtimeshaders.screens
+package com.offmind.runtimeshaders.screens.effects
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

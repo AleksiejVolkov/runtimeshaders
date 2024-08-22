@@ -1,4 +1,4 @@
-package com.offmind.runtimeshaders.screens
+package com.offmind.runtimeshaders.screens.effects
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
@@ -61,7 +61,7 @@ import kotlin.math.sqrt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LampWithShadowScreen(paddingValues: PaddingValues) {
+fun LampWithShadowScreen() {
     var percentage by remember { mutableFloatStateOf(0.15f) }
     var lampPair by remember { mutableStateOf(Offset.Zero) }
     var sliderPosition by remember { mutableStateOf(Offset.Zero) }
@@ -75,7 +75,6 @@ fun LampWithShadowScreen(paddingValues: PaddingValues) {
 
     Box(
         modifier = Modifier
-            .padding(paddingValues)
             .fillMaxSize()
             .onGloballyPositioned {
                 rootSize = Offset(it.size.width.toFloat(), it.size.height.toFloat())
