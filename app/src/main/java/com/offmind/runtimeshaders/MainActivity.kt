@@ -11,6 +11,7 @@ import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
 import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
+import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
 
@@ -37,6 +38,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.Waveshock> {
                             WaveshockOnTapScreen()
                         }
+                        composable<Route.TestShader> {
+                            TestShaderScreen()
+                        }
                     }
                 }
             }
@@ -59,6 +63,14 @@ val effects = listOf(
         screenRoute = Route.Waveshock(
             "Waveshock",
             "A waveshock on tap effect"
+        )
+    ),
+    EffectScreenData(
+        title = "Test shader",
+        description = "Shader for tests",
+        screenRoute = Route.TestShader(
+            "Test Shader",
+            "Shader for tests"
         )
     )
 )

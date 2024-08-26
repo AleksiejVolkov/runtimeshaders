@@ -1,6 +1,11 @@
 package com.offmind.runtimeshaders.scripts
 
-import com.offmind.runtimeshaders.allFunctions
+import com.offmind.runtimeshaders.functions.allColorCorrectionFunctions
+import com.offmind.runtimeshaders.functions.allCommonFunctions
+import com.offmind.runtimeshaders.functions.allEasingFunctions
+import com.offmind.runtimeshaders.functions.allNoisesFunctions
+import com.offmind.runtimeshaders.functions.allSdfFunctions
+import com.offmind.runtimeshaders.functions.allTransformationsFunctions
 import org.gradle.api.Task
 import java.io.File
 import java.util.Locale
@@ -34,6 +39,13 @@ fun createDependenciesScript(task: Task) {
 
         return dependencyMap
     }
+
+    val allFunctions = allColorCorrectionFunctions +
+            allSdfFunctions +
+            allEasingFunctions +
+            allNoisesFunctions +
+            allCommonFunctions +
+            allTransformationsFunctions
 
     val functionDependencies = generateDependencyMap(allFunctions)
 

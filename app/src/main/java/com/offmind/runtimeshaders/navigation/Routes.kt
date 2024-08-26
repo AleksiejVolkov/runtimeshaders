@@ -10,5 +10,8 @@ sealed class Route {
     class Waveshock(val title: String, val description: String) : Route()
 
     @Serializable
+    class TestShader(val title: String, val description: String) : Route()
+
+    @Serializable
     data object EffectsList : Route()
 }

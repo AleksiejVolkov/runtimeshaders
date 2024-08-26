@@ -87,20 +87,20 @@ val lampWithShadowEffect = """
         vec3 colorInShadow = GetSaturatedColor(originColor.rgb, 0.5, 0.4);
         vec3 colorInLight = GetSaturatedColor(originColor.rgb, 1.5, 1.2);
         
-        vec2 uvRotatedToLamp = rotateMatrix(uv, lampPosition, DegreesToRadians(-lampAngle));
+        vec2 uvRotatedToLamp = RotateMatrix(uv, lampPosition, DegreesToRadians(-lampAngle));
        
         float lampVerticalDistance = (uvRotatedToLamp.y-lampPosition.y)*0.4;
         float lampLightEdge = 0.5*lampWidth+lampVerticalDistance;
         float lightMask = smoothstep(lampLightEdge,lampLightEdge*0.9,abs(uvRotatedToLamp.x-lampPosition.x))*step(lampPosition.y, uvRotatedToLamp.y);
 
         vec2 angleToSliderLeftEdge = lampPosition-(seekBarPosition-vec2(0.5*sliderWidth,0.));
-        vec2 uvRotatedToSlider = rotateMatrix(uv, seekBarPosition, atan(angleToSliderLeftEdge.x,angleToSliderLeftEdge.y));
+        vec2 uvRotatedToSlider = RotateMatrix(uv, seekBarPosition, atan(angleToSliderLeftEdge.x,angleToSliderLeftEdge.y));
         float shadow = smoothstep((uv.y-seekBarPosition.y)*0.1,0.0,(uvRotatedToSlider.x-seekBarPosition.x-0.5*sliderWidth));
         
         vec2 angleToSliderRightEdge = lampPosition-(seekBarPosition+vec2(0.5*sliderWidth,0.));
-        uvRotatedToSlider = rotateMatrix(uv, seekBarPosition, atan(angleToSliderRightEdge.x,angleToSliderRightEdge.y));
-        
+        uvRotatedToSlider = RotateMatrix(uv, seekBarPosition, atan(angleToSliderRightEdge.x,angleToSliderRightEdge.y));
         shadow *= smoothstep(0.0,(uv.y-seekBarPosition.y)*0.1,(uvRotatedToSlider.x-seekBarPosition.x+0.5*sliderWidth));
+        
         shadow *= step(seekBarPosition.y, uv.y);
         
         lightMask *= 1.- shadow;
@@ -113,4 +113,43 @@ val lampWithShadowEffect = """
         vec3 finalColor = mix(colorInShadow, colorInLight, lightMask)+lampGlow*lightColor;
         return vec4(finalColor, originColor.a);
     }
+""".trimIndent()
+
+val fireShader = """
+    // Colorize function maps the noise value to a color
+    vec3 colorize(float value) {
+        vec3 color;
+        if (value < 0.5) {
+            color = mix(vec3(1.0, 1.0, 1.0), vec3(1.0, 0.5, 0.0), value * 2.0);
+        } else {
+            color = mix(vec3(1.0, 0.5, 0.0), vec3(1.0, 0.0, 0.0), (value - 0.5) * 2.0);
+        }
+        return color;
+    }
+    
+     vec4 main(float2 fragCoord) {
+        float2 uv = NormalizeCoordinates(fragCoord, resolution);
+        vec4 image = GetImageTexture(uv, vec2(0.5, 0.5), resolution);
+        vec4 imageScaled = GetImageTexture(vec2(uv.x,uv.y*0.9+0.1), vec2(0.5, 0.5), resolution);
+        
+        vec2 fbmNoiseCoords = vec2(3.*uv.x, 2.+uv.y); 
+        vec2 fbmNoiseCoords2 = vec2(8.*uv.x, 2.+3.5*uv.y+2.*time); 
+        float noiseValue = FBM(fbmNoiseCoords,5);
+        float noiseValue2 = FBM(fbmNoiseCoords2,5);
+        
+        float ground = 1.-percentage;
+        float vertical = uv.y+1.0;
+        
+        vec3 finalColor = mix(image.rgb,colorize(noiseValue),noiseValue*(1.-ground));
+        finalColor += colorize(noiseValue2)*percentage*colorize(noiseValue2)*smoothstep(-1.,.5,uv.y);
+        finalColor = mix(finalColor, vec3(0.), smoothstep(0.85*ground, 0.95*ground, noiseValue)*image.a);
+       
+       // finalColor =
+        
+        float mask = 1.-step(ground,noiseValue);
+        
+        float alpha = mix(image.a,imageScaled.a,percentage)*mask;
+        
+        return vec4(finalColor*alpha, alpha);
+     }
 """.trimIndent()

@@ -46,19 +46,19 @@ fun WaveshockOnTapScreen() {
     }
 
     Box(
-    modifier = Modifier
-    .background(MaterialTheme.colorScheme.background)
-    .fillMaxSize()
-    .pointerInput(Unit)
-    {
-        while (true) {
-            val position = this.awaitPointerEventScope {
-                awaitFirstDown().position
-            }
-            pointerPos = position
-        }
-    },
-    contentAlignment = Alignment.Center
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.background)
+            .fillMaxSize()
+            .pointerInput(Unit)
+            {
+                while (true) {
+                    val position = this.awaitPointerEventScope {
+                        awaitFirstDown().position
+                    }
+                    pointerPos = position
+                }
+            },
+        contentAlignment = Alignment.Center
     )
     {
         val shader = remember {

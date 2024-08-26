@@ -62,7 +62,7 @@ import kotlin.math.sqrt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LampWithShadowScreen() {
-    var percentage by remember { mutableFloatStateOf(0.15f) }
+    var percentage by remember { mutableFloatStateOf(0.5f) }
     var lampPair by remember { mutableStateOf(Offset.Zero) }
     var sliderPosition by remember { mutableStateOf(Offset.Zero) }
     var sliderWidth: Float by remember { mutableStateOf(0f) }
@@ -131,6 +131,7 @@ fun LampWithShadowScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Slider(
+                enabled = checked,
                 value = percentage,
                 onValueChange = { percentage = it },
                 valueRange = 0.15f..1f,
@@ -148,7 +149,7 @@ fun LampWithShadowScreen() {
                         modifier = Modifier
                             .size(30.dp)
                             .clip(CircleShape)
-                            .background(Color.White)
+                            .background(if (checked) Color.White else Color.Black)
                             .onGloballyPositioned { coordinates ->
                                 val ratio = rootSize.y / rootSize.x
                                 val globalPosition = coordinates.positionInRoot()
@@ -270,7 +271,7 @@ private fun LampBody(
                     val normalizedY =
                         ((globalPosition.y + r * sinTheta) / rootSize.y - 0.5f) * ratio
 
-                    onLampPositioned(Offset(normalizedX, normalizedY), (lampWidth/rootSize.x))
+                    onLampPositioned(Offset(normalizedX, normalizedY), (lampWidth / rootSize.x))
                 },
         )
         Column {
