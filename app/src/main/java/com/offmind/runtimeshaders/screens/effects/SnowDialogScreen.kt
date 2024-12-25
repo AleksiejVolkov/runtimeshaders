@@ -1,14 +1,28 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.offmind.runtimeshaders.screens.effects
 
 import android.graphics.RenderEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,27 +32,22 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.offmind.runtimeshaders.R
-import com.offmind.runtimeshaders.composables.ShadedBox
 import com.offmind.runtimeshaders.composables.provideTimeAsState
 import com.offmind.runtimeshaders.generated.ShaderFunction
 import com.offmind.runtimeshaders.shaders.Shader
 import org.intellij.lang.annotations.Language
 
 @Composable
-fun SnowDialogScreen() {
+fun SnowDialogScreen(paddingValues: PaddingValues) {
     var showDialog by remember { mutableStateOf(false) }
-    val snowFlakesShader = remember {
-        Shader(snowShader).getRuntimeShader(
-            customFunctions = setOf(
-                ShaderFunction.NORMALIZECOORDINATES,
-                ShaderFunction.GETIMAGETEXTURE,
-            )
-        )
-    }
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -55,15 +64,7 @@ fun SnowDialogScreen() {
                 Text("Ho-ho-ho!")
             }
         } else {
-            /*ShadedBox(
-               modifier = Modifier
-                   .fillMaxSize(),
-                shader = snowFlakesShader,
-                includeTime = true
-            ) {
-                Box(modifier = Modifier.fillMaxSize().background(color = Color.Black.copy(alpha = 0.1f)))
-            }*/
-            SnowedDialog {
+            SnowedDialog(paddingValues = paddingValues) {
                 showDialog = false
             }
         }
@@ -72,6 +73,7 @@ fun SnowDialogScreen() {
 
 @Composable
 private fun SnowedDialog(
+    paddingValues: PaddingValues,
     onDismiss: () -> Unit
 ) {
     val dialogSnowShader = remember {
@@ -84,7 +86,16 @@ private fun SnowedDialog(
         )
     }
 
-    val snowFlakesShader = remember {
+    val flakesShader = remember {
+        Shader(snowShader).getRuntimeShader(
+            customFunctions = setOf(
+                ShaderFunction.NORMALIZECOORDINATES,
+                ShaderFunction.GETIMAGETEXTURE,
+            )
+        )
+    }
+
+    val flakesShader2 = remember {
         Shader(snowShader).getRuntimeShader(
             customFunctions = setOf(
                 ShaderFunction.NORMALIZECOORDINATES,
@@ -95,48 +106,108 @@ private fun SnowedDialog(
 
     val timeState = provideTimeAsState()
     dialogSnowShader.setFloatUniform("time", timeState.value)
+
+    flakesShader.setFloatUniform("time", timeState.value)
+    flakesShader2.setFloatUniform("time", timeState.value)
+
+    flakesShader.setIntUniform("uLayers", 5)
+    flakesShader.setFloatUniform("uDepth", 0.15f)
+    flakesShader.setFloatUniform("uSpeed", 1.0f)
+
+    flakesShader2.setIntUniform("uLayers", 10)
+    flakesShader2.setFloatUniform("uDepth", 1.5f)
+    flakesShader2.setFloatUniform("uSpeed", 0.8f)
+
     LaunchedEffect(timeState) {
+        flakesShader.setFloatUniform("time", timeState.value)
         dialogSnowShader.setFloatUniform("time", timeState.value)
-        snowFlakesShader.setFloatUniform("time", timeState.value)
+        flakesShader2.setFloatUniform("time", timeState.value)
     }
 
-    BasicAlertDialog(
+    Dialog(
         onDismissRequest = { onDismiss() },
-        modifier = Modifier
-            .onSizeChanged { size ->
-                dialogSnowShader.setFloatUniform(
-                    "resolution",
-                    size.width.toFloat(),
-                    size.height.toFloat()
-                )
-            }
-            .graphicsLayer {
-                this.renderEffect = RenderEffect
-                    .createRuntimeShaderEffect(dialogSnowShader, "image")
-                    .asComposeRenderEffect()
-            }
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+        )
     ) {
-        Column(
-            Modifier
-                .background(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface)
-                .padding(16.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    flakesShader.setFloatUniform(
+                        "resolution",
+                        size.width.toFloat(),
+                        size.height.toFloat()
+                    )
+                }
+                .graphicsLayer {
+                    this.renderEffect = RenderEffect
+                        .createRuntimeShaderEffect(flakesShader, "image")
+                        .asComposeRenderEffect()
+                }
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text("Merry Christmas!", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(10.dp))
-            Text("Happy New Year!")
-            Spacer(modifier = Modifier.height(26.dp))
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                    .fillMaxSize()
+                    .onSizeChanged { size ->
+                        flakesShader2.setFloatUniform(
+                            "resolution",
+                            size.width.toFloat(),
+                            size.height.toFloat()
+                        )
+                    }
+                    .graphicsLayer {
+                        this.renderEffect = RenderEffect
+                            .createRuntimeShaderEffect(flakesShader2, "image")
+                            .asComposeRenderEffect()
+                    }
             ) {
-                Text(
+                Box(
                     modifier = Modifier
-                        .clickable { onDismiss() }
-                        .padding(5.dp),
-                    text = "Close",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary)
+                        .fillMaxSize()
+                        .background(color = Color.Black.copy(0.1f))
                 )
+            }
+            Column(
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .background(
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surface
+                    )
+                    .onSizeChanged { size ->
+                        dialogSnowShader.setFloatUniform(
+                            "resolution",
+                            size.width.toFloat(),
+                            size.height.toFloat()
+                        )
+                    }
+                    .graphicsLayer {
+                        this.renderEffect = RenderEffect
+                            .createRuntimeShaderEffect(dialogSnowShader, "image")
+                            .asComposeRenderEffect()
+                    }
+                    .padding(16.dp),
+            ) {
+                Text("Merry Christmas!", style = MaterialTheme.typography.titleLarge)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Happy New Year!")
+                Spacer(modifier = Modifier.height(26.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        modifier = Modifier
+                            .clickable { onDismiss() }
+                            .padding(5.dp),
+                        text = "Close",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary)
+                    )
+                }
             }
         }
     }
@@ -145,25 +216,13 @@ private fun SnowedDialog(
 @Language("agsl")
 private val dialogSnowBottom = """
     
-      vec4 imageWithAlpha(vec4 image, vec2 uv, vec2 resolution) {
-           vec4 correcteImage = image;
-           float ratio = resolution.x / resolution.y;
-           if (abs(uv.x) > 0.5 * ratio || abs(uv.y) > 0.5) {
-               correcteImage.a = 0.0;
-           }
-            return correcteImage;
-       }
-       
-       vec4 main(float2 fragCoord) {
+     vec4 main(float2 fragCoord) {
             float2 uv = NormalizeCoordinates(fragCoord, resolution);
             vec4 image = GetImageTexture(uv, vec2(0.5, 0.5), resolution);
-            image = imageWithAlpha(image, uv, resolution);
             
             float ratio = resolution.x / resolution.y;
-            
-            
+           
             float amplitude = clamp(time*0.5, 0.0,1.);
-           // amplitude = 0.0;
             float wave = RandomSinWave(uv.x, 10., 0.1, 0.6)*amplitude;
       
             float snowMask = uv.y-0.48 < wave*0.4*length(uv.x*uv.x) ? 1.0 : .0;
@@ -178,10 +237,8 @@ private val dialogSnowBottom = """
             
             if(uv.x > snowArea.x && uv.x < snowArea.y && uv.y > snowArea.z && uv.y < snowArea.w) {
                 snow = snowMask*vec4(vec3(1.0),1.0);
-              // snow = vec4(vec3(.5),1.0);
             }
             
-            //vec3 finalColor = mix(image.rgb, vec3(1.0), snowMask);
             vec4 finalColor = mix(image, snow, snow.a);
             
             return vec4(finalColor.rgb*finalColor.a, finalColor.a);
@@ -190,25 +247,33 @@ private val dialogSnowBottom = """
 
 @Language("agsl")
 val snowShader = """
-   const int LAYERS = 15; // Reduced layers for better performance
-   const float DEPTH = 0.15; // Increased depth per layer to compensate for fewer layers
+   uniform int uLayers;
+   uniform float uDepth;
+   uniform float uSpeed;
+   
+   const int MAX_LAYERS = 50;
    const float WIDTH = 0.4;
-   const float SPEED = 1.0;
+   
 
    vec4 main(float2 fragCoord) {
        float2 uv = NormalizeCoordinates(fragCoord, resolution);  
+       vec4 image = GetImageTexture(uv, vec2(0.5, 0.5), resolution);
        const mat3 p = mat3(13.323122, 23.5112, 21.71123, 21.1212, 28.7312, 11.9312, 21.8112, 14.7212, 61.3934);
+       
+       float ratio = resolution.y / resolution.x;
 
        vec3 acc = vec3(0.0);
        float alpha = 0.0; // Initialize alpha
        float dof = 5.0 * sin(time * 0.1);
 
-       for (int i = 0; i < LAYERS; i++) {
+       for (int i = 0; i < MAX_LAYERS; i++) {
+           if (i >= uLayers) break; // Break out of the loop if i exceeds uLayers
+         
            float fi = float(i);
-           vec2 q = uv * (1.0 + fi * DEPTH);
+           vec2 q = uv * (1.0 + fi * uDepth);
            
            // Adjust flake position with modulation and time
-           q -= vec2(q.y * (WIDTH * mod(fi * 7.238917, 1.0) - WIDTH * 0.5), SPEED * time / (1.0 + fi * DEPTH * 0.03));
+           q -= vec2(q.y * (WIDTH * mod(fi * 7.238917, 1.0) - WIDTH * 0.5), uSpeed * time / (1.0 + fi * uDepth * 0.03));
            
            vec3 n = vec3(floor(q), 31.189 + fi);
            vec3 m = floor(n) * 0.00001 + fract(n);
@@ -218,10 +283,11 @@ val snowShader = """
            // Rounded snowflake shape using a circular mask
            float2 center = mod(q, 1.0) - 0.5 + 0.5 * r.xy;
            float distanceToCenter = length(center); // Circular distance
-           float flakeRadius = 0.02 + 0.01 * r.z; // Vary radius slightly per flake
+           float flakeRadius = 0.015 + 0.01 * r.z; // Vary radius slightly per flake
 
            // Smoother edges with extended smoothstep
-           float intensity = smoothstep(flakeRadius + 0.01, flakeRadius, distanceToCenter) * smoothstep(flakeRadius, flakeRadius - 0.01, distanceToCenter);
+           float intensity = smoothstep(flakeRadius + 0.015, flakeRadius, distanceToCenter) * 
+                               smoothstep(flakeRadius, flakeRadius - 0.015, distanceToCenter);
 
            // Ensure flakes are white or transparent (prevent black color)
            vec3 flakeColor = vec3(1.0); // White color for flakes
@@ -234,8 +300,13 @@ val snowShader = """
        // Normalize alpha to ensure it doesn’t exceed 1.0
        alpha = clamp(alpha, 0.0, 1.0);
 
-       // Return the final color with proper transparency
-       return vec4(acc, alpha);
+       vec3 finalColor = mix(image.rgb, acc, alpha);
+       
+       if(uv.y < -0.5*ratio || uv.y > .5*ratio) {
+           finalColor = vec3(0.0);
+           alpha = 0.0;
+       }
+       return vec4(finalColor, alpha+image.a);
    }
 """.trimIndent()
 

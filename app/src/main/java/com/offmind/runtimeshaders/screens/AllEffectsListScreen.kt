@@ -32,7 +32,7 @@ fun AllEffectsListScreen(
     navController: NavController
 ) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(paddingValues),
         contentAlignment = androidx.compose.ui.Alignment.BottomEnd
     ) {
         Image(

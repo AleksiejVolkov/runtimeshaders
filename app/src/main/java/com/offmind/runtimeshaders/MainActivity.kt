@@ -21,7 +21,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         enableEdgeToEdge()
 
         setContent {
@@ -44,10 +43,10 @@ class MainActivity : ComponentActivity() {
                             WaveshockOnTapScreen()
                         }
                         composable<Route.SnowedDialog> {
-                            SnowDialogScreen()
+                            SnowDialogScreen(paddingValues = paddingValues)
                         }
                         composable<Route.TestShader> {
-                            TestShaderScreen()
+                            TestShaderScreen(paddingValues = paddingValues)
                         }
                     }
                 }
