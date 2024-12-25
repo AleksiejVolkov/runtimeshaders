@@ -5,7 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,7 +28,7 @@ import com.offmind.runtimeshaders.shaders.fireShader
 import kotlinx.coroutines.delay
 
 @Composable
-fun TestShaderScreen() {
+fun TestShaderScreen(paddingValues: PaddingValues) {
     var percentage by remember { mutableFloatStateOf(0.0f) }
     var trigger by remember { mutableStateOf(false) }
 
@@ -42,6 +44,7 @@ fun TestShaderScreen() {
 
     Box(
         modifier = Modifier
+            .padding(paddingValues)
             .fillMaxSize()
             .background(Color(0xFF1D1D1D)),
         contentAlignment = Alignment.Center

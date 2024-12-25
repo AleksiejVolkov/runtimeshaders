@@ -3,6 +3,7 @@ package com.offmind.runtimeshaders
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Scaffold
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -11,6 +12,7 @@ import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
 import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
+import com.offmind.runtimeshaders.screens.effects.SnowDialogScreen
 import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
@@ -19,6 +21,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
         setContent {
             val navController = rememberNavController()
             RuntimeShadersTheme {
@@ -38,8 +42,11 @@ class MainActivity : ComponentActivity() {
                         composable<Route.Waveshock> {
                             WaveshockOnTapScreen()
                         }
+                        composable<Route.SnowedDialog> {
+                            SnowDialogScreen(paddingValues = paddingValues)
+                        }
                         composable<Route.TestShader> {
-                            TestShaderScreen()
+                            TestShaderScreen(paddingValues = paddingValues)
                         }
                     }
                 }
@@ -63,6 +70,14 @@ val effects = listOf(
         screenRoute = Route.Waveshock(
             "Waveshock",
             "A waveshock on tap effect"
+        )
+    ),
+    EffectScreenData(
+        title = "Snowed Dialog",
+        description = "",
+        screenRoute = Route.SnowedDialog(
+            "Christmas",
+            ""
         )
     ),
     EffectScreenData(

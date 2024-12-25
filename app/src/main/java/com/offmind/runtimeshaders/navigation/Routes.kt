@@ -14,4 +14,7 @@ sealed class Route {
 
     @Serializable
     data object EffectsList : Route()
+
+    @Serializable
+    data class SnowedDialog(val title: String, val description: String) : Route()
 }

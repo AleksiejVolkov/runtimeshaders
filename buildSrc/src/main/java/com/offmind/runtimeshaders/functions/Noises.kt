@@ -64,8 +64,17 @@ val FBMFunction = """
 }
 """.trimIndent()
 
+val RandomSineWaveFunction = """
+    float RandomSinWave(float x, float frequency, float amplitude, float randomness) {
+        float baseWave = sin(x * frequency) * amplitude;
+        float noise = Noise(vec2(x * frequency, randomness));
+        return baseWave + noise * randomness;
+    }
+""".trimIndent()
+
 val allNoisesFunctions = mapOf(
     "SimplexNoise" to SimplexNoiseFunction,
     "Noise" to NoiseFunction,
-    "FBM" to FBMFunction
+    "FBM" to FBMFunction,
+    "RandomSineWave" to RandomSineWaveFunction
 )
