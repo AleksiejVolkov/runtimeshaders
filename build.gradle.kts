@@ -4,5 +4,5 @@ plugins {
     id("com.android.application") version "8.7.3" apply false
     id("org.jetbrains.kotlin.android") version kotlin apply false
     id("org.jetbrains.kotlin.plugin.serialization") version kotlin apply false
-//    id("org.jetbrains.kotlin.plugin.compose") version kotlin apply false
+    id("org.jetbrains.kotlin.plugin.compose") version kotlin apply false
 }
