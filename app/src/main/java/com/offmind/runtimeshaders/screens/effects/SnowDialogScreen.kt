@@ -1,14 +1,28 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.offmind.runtimeshaders.screens.effects
 
 import android.graphics.RenderEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.offmind.runtimeshaders.R
-import com.offmind.runtimeshaders.composables.ShadedBox
 import com.offmind.runtimeshaders.composables.provideTimeAsState
 import com.offmind.runtimeshaders.generated.ShaderFunction
 import com.offmind.runtimeshaders.shaders.Shader
@@ -32,7 +45,9 @@ fun SnowDialogScreen(paddingValues: PaddingValues) {
     var showDialog by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier.fillMaxSize().padding(paddingValues),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -67,7 +82,6 @@ private fun SnowedDialog(
                 ShaderFunction.NORMALIZECOORDINATES,
                 ShaderFunction.GETIMAGETEXTURE,
                 ShaderFunction.RANDOMSINEWAVE,
-                ShaderFunction.EXPONENTIALOUT
             )
         )
     }
@@ -98,11 +112,11 @@ private fun SnowedDialog(
 
     flakesShader.setIntUniform("uLayers", 5)
     flakesShader.setFloatUniform("uDepth", 0.15f)
-    flakesShader.setFloatUniform("uSpeed", 0.5f)
+    flakesShader.setFloatUniform("uSpeed", 1.0f)
 
     flakesShader2.setIntUniform("uLayers", 10)
-    flakesShader2.setFloatUniform("uDepth", 0.15f)
-    flakesShader2.setFloatUniform("uSpeed", 0.2f)
+    flakesShader2.setFloatUniform("uDepth", 1.5f)
+    flakesShader2.setFloatUniform("uSpeed", 0.8f)
 
     LaunchedEffect(timeState) {
         flakesShader.setFloatUniform("time", timeState.value)
@@ -150,14 +164,19 @@ private fun SnowedDialog(
                             .asComposeRenderEffect()
                     }
             ) {
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .background(color = Color.Black.copy(0.1f)))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(color = Color.Black.copy(0.1f))
+                )
             }
             Column(
                 Modifier
                     .padding(horizontal = 16.dp)
-                    .background(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface)
+                    .background(
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surface
+                    )
                     .onSizeChanged { size ->
                         dialogSnowShader.setFloatUniform(
                             "resolution",
@@ -203,30 +222,21 @@ private val dialogSnowBottom = """
             
             float ratio = resolution.x / resolution.y;
            
-            float amplitude = clamp(ExponentialOut(time*0.05), 0., 1.);
-            float wave = RandomSinWave(uv.x, 20., 0.2, 0.6)*amplitude;
+            float amplitude = clamp(time*0.5, 0.0,1.);
+            float wave = RandomSinWave(uv.x, 10., 0.1, 0.6)*amplitude;
       
-            float borderThreshold = 0.03; // Adjust for smoother transition width
-            float snowMask = smoothstep(borderThreshold, 0.0, uv.y - 0.48 - wave * 0.4 * length(uv.x * uv.x));
+            float snowMask = uv.y-0.48 < wave*0.4*length(uv.x*uv.x) ? 1.0 : .0;
             
-            float topBound = 0.49+(sin(5.*uv.x)*0.5+0.5)*0.01*(10.-10.*amplitude)-0.1*length(uv.x*uv.x);
+            float topBound = 0.5+(sin(10.*uv.x)*0.5+0.5)*0.01*(10.-10.*amplitude)-0.1*length(uv.x*uv.x);
+            float leftBound = -.5*ratio+(sin(10.*uv.y)*0.5+0.5)*0.5*length(uv.y-topBound);
+            float rightBound = .5*ratio-(sin(10.*uv.y)*0.5+0.5)*0.4*length(uv.y-topBound);
             
-            float leftBound = (-.505)*ratio+(sin(10.*uv.y)*0.5+0.5)*0.5*length(uv.y-topBound);
-            float rightBound = (.505)*ratio-(sin(10.*uv.y)*0.5+0.5)*0.5*length(uv.y-topBound);
-            
-            // Smooth transition for topBound
-            float topMask = smoothstep(topBound, topBound+borderThreshold, uv.y);
-            float leftMask = smoothstep(leftBound, leftBound+borderThreshold, uv.x);
-            float rightMask = smoothstep(rightBound+borderThreshold, rightBound, uv.x+borderThreshold);
-
             vec4 snowArea = vec4(leftBound, rightBound, topBound, 1.0);
             
             vec4 snow = vec4(0.0);
             
             if(uv.x > snowArea.x && uv.x < snowArea.y && uv.y > snowArea.z && uv.y < snowArea.w) {
-                 // Combine topMask for smooth border
-                float finalMask = snowMask * topMask * leftMask * rightMask;
-                snow = finalMask * vec4(vec3(0.95, 0.96, 1.0), 1.0);
+                snow = snowMask*vec4(vec3(1.0),1.0);
             }
             
             vec4 finalColor = mix(image, snow, snow.a);
@@ -286,19 +296,16 @@ val snowShader = """
            // Accumulate alpha with smooth transition
            alpha += intensity;
        }
-       
-       float timedAlpha = clamp(time, 0.0, 1.0);
 
        // Normalize alpha to ensure it doesn’t exceed 1.0
-       alpha = clamp(alpha*timedAlpha, 0.0, 1.0);
-     
-       vec3 finalColor = mix(image.rgb, acc, alpha*timedAlpha);
+       alpha = clamp(alpha, 0.0, 1.0);
+
+       vec3 finalColor = mix(image.rgb, acc, alpha);
        
        if(uv.y < -0.5*ratio || uv.y > .5*ratio) {
            finalColor = vec3(0.0);
            alpha = 0.0;
        }
-       
        return vec4(finalColor, alpha+image.a);
    }
 """.trimIndent()
