@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.offmind.runtimeshaders.screens.effects
 
 import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,15 +17,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.StateObject
+import androidx.compose.runtime.snapshots.StateRecord
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,7 +36,9 @@ import com.offmind.runtimeshaders.R
 import com.offmind.runtimeshaders.composables.provideTimeAsState
 import com.offmind.runtimeshaders.generated.ShaderFunction
 import com.offmind.runtimeshaders.shaders.Shader
+import com.offmind.runtimeshaders.shaders.mutableRuntimeShaderStateOf
 import org.intellij.lang.annotations.Language
+import java.util.concurrent.atomic.AtomicInteger
 
 @Composable
 fun SnowDialogScreen(paddingValues: PaddingValues) {
@@ -77,54 +77,62 @@ private fun SnowedDialog(
     onDismiss: () -> Unit
 ) {
     val dialogSnowShader = remember {
-        Shader(dialogSnowBottom).getRuntimeShader(
-            customFunctions = setOf(
-                ShaderFunction.NORMALIZECOORDINATES,
-                ShaderFunction.GETIMAGETEXTURE,
-                ShaderFunction.RANDOMSINEWAVE,
+        mutableRuntimeShaderStateOf(
+            Shader(dialogSnowBottom).getRuntimeShader(
+                customFunctions = setOf(
+                    ShaderFunction.NORMALIZECOORDINATES,
+                    ShaderFunction.GETIMAGETEXTURE,
+                    ShaderFunction.RANDOMSINEWAVE,
+                )
             )
         )
     }
 
     val flakesShader = remember {
-        Shader(snowShader).getRuntimeShader(
+        mutableRuntimeShaderStateOf(Shader(snowShader).getRuntimeShader(
             customFunctions = setOf(
                 ShaderFunction.NORMALIZECOORDINATES,
                 ShaderFunction.GETIMAGETEXTURE,
             )
-        )
+        ))
     }
 
     val flakesShader2 = remember {
-        Shader(snowShader).getRuntimeShader(
+        mutableRuntimeShaderStateOf(Shader(snowShader).getRuntimeShader(
             customFunctions = setOf(
                 ShaderFunction.NORMALIZECOORDINATES,
                 ShaderFunction.GETIMAGETEXTURE,
             )
-        )
+        ))
     }
 
     val timeState = provideTimeAsState()
-    dialogSnowShader.setFloatUniform("time", timeState.value)
 
-    flakesShader.setFloatUniform("time", timeState.value)
-    flakesShader2.setFloatUniform("time", timeState.value)
-
-    flakesShader.setIntUniform("uLayers", 5)
-    flakesShader.setFloatUniform("uDepth", 0.15f)
-    flakesShader.setFloatUniform("uSpeed", 1.0f)
-
-    flakesShader2.setIntUniform("uLayers", 10)
-    flakesShader2.setFloatUniform("uDepth", 1.5f)
-    flakesShader2.setFloatUniform("uSpeed", 0.8f)
-
-    LaunchedEffect(timeState) {
-        flakesShader.setFloatUniform("time", timeState.value)
-        dialogSnowShader.setFloatUniform("time", timeState.value)
-        flakesShader2.setFloatUniform("time", timeState.value)
+    flakesShader.update {
+        setIntUniform("uLayers", 5)
+        setFloatUniform("uDepth", 0.15f)
+        setFloatUniform("uSpeed", 1.0f)
     }
 
-    Dialog(
+    flakesShader2.update {
+        setIntUniform("uLayers", 15)
+        setFloatUniform("uDepth", 0.2f)
+        setFloatUniform("uSpeed", 0.8f)
+    }
+
+    LaunchedEffect(timeState.value) {
+        dialogSnowShader.update {
+            setFloatUniform("time", timeState.value)
+        }
+        flakesShader.update{
+            setFloatUniform("time", timeState.value)
+        }
+        flakesShader2.update {
+            setFloatUniform("time", timeState.value)
+        }
+    }
+
+    BasicAlertDialog(
         onDismissRequest = { onDismiss() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
@@ -134,7 +142,7 @@ private fun SnowedDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { size ->
-                    flakesShader.setFloatUniform(
+                    flakesShader.value.setFloatUniform(
                         "resolution",
                         size.width.toFloat(),
                         size.height.toFloat()
@@ -142,7 +150,7 @@ private fun SnowedDialog(
                 }
                 .graphicsLayer {
                     this.renderEffect = RenderEffect
-                        .createRuntimeShaderEffect(flakesShader, "image")
+                        .createRuntimeShaderEffect(flakesShader.value, "image")
                         .asComposeRenderEffect()
                 }
                 .padding(16.dp),
@@ -152,7 +160,7 @@ private fun SnowedDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .onSizeChanged { size ->
-                        flakesShader2.setFloatUniform(
+                        flakesShader2.value.setFloatUniform(
                             "resolution",
                             size.width.toFloat(),
                             size.height.toFloat()
@@ -160,7 +168,7 @@ private fun SnowedDialog(
                     }
                     .graphicsLayer {
                         this.renderEffect = RenderEffect
-                            .createRuntimeShaderEffect(flakesShader2, "image")
+                            .createRuntimeShaderEffect(flakesShader2.value, "image")
                             .asComposeRenderEffect()
                     }
             ) {
@@ -178,15 +186,16 @@ private fun SnowedDialog(
                         color = MaterialTheme.colorScheme.surface
                     )
                     .onSizeChanged { size ->
-                        dialogSnowShader.setFloatUniform(
+                        dialogSnowShader.value.setFloatUniform(
                             "resolution",
                             size.width.toFloat(),
                             size.height.toFloat()
                         )
                     }
                     .graphicsLayer {
+                        println("HUI gl called")
                         this.renderEffect = RenderEffect
-                            .createRuntimeShaderEffect(dialogSnowShader, "image")
+                            .createRuntimeShaderEffect(dialogSnowShader.value, "image")
                             .asComposeRenderEffect()
                     }
                     .padding(16.dp),

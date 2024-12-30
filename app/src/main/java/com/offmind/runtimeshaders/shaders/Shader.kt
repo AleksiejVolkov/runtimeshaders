@@ -1,8 +1,12 @@
 package com.offmind.runtimeshaders.shaders
 
 import android.graphics.RuntimeShader
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SnapshotMutationPolicy
+import androidx.compose.runtime.mutableStateOf
 import com.offmind.runtimeshaders.generated.ShaderDependencyMap
 import com.offmind.runtimeshaders.generated.ShaderFunction
+import java.util.concurrent.atomic.AtomicInteger
 
 class Shader(private val shaderCode: String) {
 
@@ -112,3 +116,51 @@ sealed class ShaderTypedValue() {
     data class Vec3Type(val value1: Float, val value2: Float, val value3: Float): ShaderTypedValue()
     data class Vec4Type(val value1: Float, val value2: Float, val value3: Float, val value4: Float): ShaderTypedValue()
 }
+
+
+class MutableRuntimeShaderState(
+    initialShader: RuntimeShader
+) : MutableState<RuntimeShader> {
+    private val changeTracker = AtomicInteger(0) // Tracks state changes
+
+    private val shaderPolicy = object : SnapshotMutationPolicy<RuntimeShader> {
+        private var lastChangeCount = 0
+
+        override fun equivalent(a: RuntimeShader, b: RuntimeShader): Boolean {
+            return changeTracker.get() == lastChangeCount
+        }
+
+        fun updateStateAfterComparison() {
+            lastChangeCount = changeTracker.get()
+        }
+    }
+
+    private var internalShader: RuntimeShader = initialShader
+    private val state = mutableStateOf(
+        initialShader,
+        policy = shaderPolicy
+    )
+
+    override var value: RuntimeShader
+        get() = state.value
+        set(value) {
+            if (state.value !== value) {
+                state.value = value
+            }
+        }
+
+    override fun component1(): RuntimeShader = value
+    override fun component2(): (RuntimeShader) -> Unit = { value = it }
+
+    fun update(action: RuntimeShader.() -> Unit) {
+        internalShader.action()
+        changeTracker.incrementAndGet()
+        state.value = internalShader
+        shaderPolicy.updateStateAfterComparison()
+    }
+}
+
+fun mutableRuntimeShaderStateOf(shader: RuntimeShader): MutableRuntimeShaderState {
+    return MutableRuntimeShaderState(shader)
+}
+
