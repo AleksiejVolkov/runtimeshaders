@@ -37,8 +37,8 @@ fun ShadedBox(
     includeTime: Boolean = false,
     content: @Composable () -> Unit = {}
 ) {
+    val timeState = provideTimeAsState()
     if (includeTime) {
-        val timeState = provideTimeAsState()
         shader.setFloatUniform("time", timeState.value)
         LaunchedEffect(timeState) {
             shader.setFloatUniform("time", timeState.value)
@@ -55,6 +55,7 @@ fun ShadedBox(
         }
         .graphicsLayer {
             applyShaderProperties(shader, shaderUniforms)
+            shader.setFloatUniform("time", timeState.value)
             this.renderEffect = RenderEffect
                 .createRuntimeShaderEffect(shader, "image")
                 .asComposeRenderEffect()

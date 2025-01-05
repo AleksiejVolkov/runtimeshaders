@@ -13,6 +13,9 @@ sealed class Route {
     class TestShader(val title: String, val description: String) : Route()
 
     @Serializable
+    data class CircleTimer(val title: String, val description: String) : Route()
+
+    @Serializable
     data object EffectsList : Route()
 
     @Serializable

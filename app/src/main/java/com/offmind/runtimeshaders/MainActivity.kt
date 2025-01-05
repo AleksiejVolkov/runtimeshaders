@@ -11,10 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
-import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
-import com.offmind.runtimeshaders.screens.effects.SnowDialogScreen
-import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
-import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
+import com.offmind.runtimeshaders.screens.effects.*
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
 
 class MainActivity : ComponentActivity() {
@@ -47,6 +44,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<Route.TestShader> {
                             TestShaderScreen(paddingValues = paddingValues)
+                        }
+                        composable<Route.CircleTimer> {
+                            TimerShaderScreen(paddingValues = paddingValues)
                         }
                     }
                 }
@@ -84,6 +84,14 @@ val effects = listOf(
         title = "Test shader",
         description = "Shader for tests",
         screenRoute = Route.TestShader(
+            "Test Shader",
+            "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Circular Timer",
+        description = "Shader for tests",
+        screenRoute = Route.CircleTimer(
             "Test Shader",
             "Shader for tests"
         )
