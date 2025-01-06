@@ -68,7 +68,6 @@ fun WaveshockOnTapScreen() {
             )
         }
         ShadedBox(
-            modifier = Modifier.fillMaxSize(),
             shader = shader,
             shaderUniforms = mapOf(
                 "time" to ShaderTypedValue.FloatType(provideTimeAsState().value),

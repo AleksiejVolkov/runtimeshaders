@@ -59,7 +59,8 @@ fun ShadedBox(
             this.renderEffect = RenderEffect
                 .createRuntimeShaderEffect(shader, "image")
                 .asComposeRenderEffect()
-        }) {
+        },
+        contentAlignment = androidx.compose.ui.Alignment.Center) {
         content()
     }
 }

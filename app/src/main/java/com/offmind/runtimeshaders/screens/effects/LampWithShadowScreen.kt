@@ -166,7 +166,7 @@ fun LampWithShadowScreen() {
             )
         }
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(50.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Switch(
