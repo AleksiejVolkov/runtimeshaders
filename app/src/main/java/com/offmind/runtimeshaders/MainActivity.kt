@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
+import com.offmind.runtimeshaders.screens.editor.NodeEditScreen
 import com.offmind.runtimeshaders.screens.effects.*
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
 
@@ -45,8 +46,14 @@ class MainActivity : ComponentActivity() {
                         composable<Route.TestShader> {
                             TestShaderScreen(paddingValues = paddingValues)
                         }
+                        composable<Route.BatteryIndicator> {
+                            CircleBatteryIndicatorScreen(paddingValues = paddingValues)
+                        }
                         composable<Route.CircleTimer> {
                             TimerShaderScreen(paddingValues = paddingValues)
+                        }
+                        composable<Route.NodeEditor> {
+                            NodeEditScreen(paddingValues = paddingValues)
                         }
                     }
                 }
@@ -94,6 +101,22 @@ val effects = listOf(
         screenRoute = Route.CircleTimer(
             "Test Shader",
             "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Battery Indicator",
+        description = "Shader for tests",
+        screenRoute = Route.BatteryIndicator(
+            "Test Shader",
+            "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Node editor",
+        description = "Shader for tests",
+        screenRoute = Route.NodeEditor(
+            "Node editor",
+            "lab"
         )
     )
 )

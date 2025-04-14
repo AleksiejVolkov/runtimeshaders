@@ -16,8 +16,14 @@ sealed class Route {
     data class CircleTimer(val title: String, val description: String) : Route()
 
     @Serializable
+    data class BatteryIndicator(val title: String, val description: String) : Route()
+
+    @Serializable
     data object EffectsList : Route()
 
     @Serializable
     data class SnowedDialog(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NodeEditor(val title: String, val description: String) : Route()
 }

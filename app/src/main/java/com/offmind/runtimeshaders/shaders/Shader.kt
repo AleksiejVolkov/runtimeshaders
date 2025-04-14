@@ -4,6 +4,7 @@ import android.graphics.RuntimeShader
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SnapshotMutationPolicy
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
 import com.offmind.runtimeshaders.generated.ShaderDependencyMap
 import com.offmind.runtimeshaders.generated.ShaderFunction
 import java.util.concurrent.atomic.AtomicInteger
@@ -117,6 +118,9 @@ sealed class ShaderTypedValue() {
     data class Vec4Type(val value1: Float, val value2: Float, val value3: Float, val value4: Float): ShaderTypedValue()
 }
 
+fun Color.toVec4Type(): ShaderTypedValue.Vec4Type {
+    return ShaderTypedValue.Vec4Type(red, green, blue, alpha)
+}
 
 class MutableRuntimeShaderState(
     initialShader: RuntimeShader
