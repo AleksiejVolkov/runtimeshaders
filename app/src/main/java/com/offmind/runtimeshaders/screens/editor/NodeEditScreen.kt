@@ -2,6 +2,8 @@ package com.offmind.runtimeshaders.screens.editor
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,16 +16,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.offmind.runtimeshaders.composables.ShadedBox
 import com.offmind.runtimeshaders.composables.ui.NodeCanvas
+import com.offmind.runtimeshaders.screens.editor.dialog.DialogState
+import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.ManageNodeBottomShitDialog
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
 import com.offmind.runtimeshaders.shaders.Shader
 import com.offmind.runtimeshaders.shaders.toVec4Type
@@ -34,6 +43,7 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
 
     val vm = koinViewModel<NodeEditorViewModel>()
     val state = vm.state.collectAsState()
+    var dialogState by remember { mutableStateOf(DialogState(false))}
 
     val colorNode = state.value.nodes.firstOrNull { it.nodeDataType is NodeDataType.ColorNode }
 
@@ -57,9 +67,13 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                 nodes = state.value.nodes,
                 vm = vm,
                 connections = state.value.connections,
-            ) { nodeId, newPosition ->
-                vm.onNodePositionChange(nodeId, newPosition)
-            }
+                onNodePositionChange = { id, position ->
+                    vm.onNodePositionChange(id, position)
+                },
+                onDoubleTap = {
+                    dialogState = DialogState(true)
+                }
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -73,6 +87,19 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                     )
             )
         }
+    }
+
+    if (dialogState.showManageNodeDialog) {
+        ManageNodeBottomShitDialog(
+            modifier = Modifier.fillMaxWidth(),
+            onDismissRequest = {
+                dialogState = DialogState()
+            },
+            onAddNodeClicked = {
+                vm.addNode(it)
+                dialogState = DialogState()
+            }
+        )
     }
 
 }
