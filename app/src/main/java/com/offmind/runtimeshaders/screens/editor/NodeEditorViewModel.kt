@@ -10,14 +10,21 @@ import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.AddUINodeIte
 import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
 import com.offmind.runtimeshaders.screens.editor.model.NodeData
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
+import com.offmind.runtimeshaders.screens.editor.usecase.NodesToCodeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
-class NodeEditorViewModel : ViewModel() {
+class NodeEditorViewModel(
+    val nodesToCodeUseCase: NodesToCodeUseCase,
+) : ViewModel() {
 
     private val _state: MutableStateFlow<NodeEditorState> = MutableStateFlow(NodeEditorState())
     val state: StateFlow<NodeEditorState> = _state
+
+    companion object {
+        const val OUTPUT_NODE_ID = -1
+    }
 
     private val startNodes = mutableStateListOf(
         NodeData(
@@ -27,7 +34,7 @@ class NodeEditorViewModel : ViewModel() {
             nodeDataType = NodeDataType.ColorNode(Color.White)
         ),
         NodeData(
-            id = 1,
+            id = OUTPUT_NODE_ID,
             name = "Output",
             position = Offset(300f, 50f),
             nodeDataType = NodeDataType.OutputNode(Color.Black)
@@ -37,7 +44,7 @@ class NodeEditorViewModel : ViewModel() {
     private val connections: List<NodeConnection> = listOf(
         NodeConnection(
             fromNode = 0,
-            toNode = 1
+            toNode = OUTPUT_NODE_ID,
         )
     )
 
