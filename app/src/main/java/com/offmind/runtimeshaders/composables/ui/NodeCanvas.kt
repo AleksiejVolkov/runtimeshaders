@@ -1,16 +1,12 @@
 package com.offmind.runtimeshaders.composables.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -35,8 +31,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -82,63 +76,52 @@ fun NodeCanvas(
             }
             .onGloballyPositioned {
                 val size = it.size.toSize()
-
             }
     ) {
-        // Draw connection lines first
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            connections.forEach { connection ->
-                // Use the captured anchor positions for output and input.
-                // Fallback to using your node position + an offset if not yet captured.
-                val startPoint = outputAnchorPositions[connection.fromNode]!! + nodes.find { it.id == connection.fromNode }!!.position + canvasOffset
-                 val endPoint = inputAnchorPositions[connection.toNode]!! + nodes.find { it.id == connection.toNode }!!.position +  canvasOffset
+        DrawConnectionLines(
+            connections = connections,
+            nodes = nodes,
+            outputAnchorPositions = outputAnchorPositions,
+            inputAnchorPositions = inputAnchorPositions,
+            canvasOffset = canvasOffset
+        )
 
-                // Define a horizontal offset for the control points.
-                // You might want to adjust these values based on your UI needs.
-                val controlOffset =
-                    100f  // This can be dynamic based on start/end distances if needed
+        RenderNodes(
+            nodes = nodes,
+            canvasOffset = canvasOffset,
+            vm = vm,
+            inputAnchorPositions = inputAnchorPositions,
+            outputAnchorPositions = outputAnchorPositions,
+            onNodePositionChange = onNodePositionChange
+        )
+    }
+}
 
-                // First control point: a bit to the right of the start point.
-                val controlPoint1 = Offset(startPoint.x + controlOffset, startPoint.y)
-                // Second control point: a bit to the left of the end point.
-                val controlPoint2 = Offset(endPoint.x - controlOffset, endPoint.y)
-
-                // Create the path with a cubic Bézier curve.
-                val path = Path().apply {
-                    moveTo(startPoint.x, startPoint.y)
-                    cubicTo(
-                        controlPoint1.x, controlPoint1.y,
-                        controlPoint2.x, controlPoint2.y,
-                        endPoint.x, endPoint.y
-                    )
-                }
-
-                // Draw the path on the Canvas.
-                drawPath(
-                    path = path,
-                    color = Color.White,
-                    style = Stroke(width = 2.dp.toPx())
-                )
+@Composable
+fun RenderNodes(
+    nodes: List<NodeData>,
+    canvasOffset: Offset,
+    vm: NodeEditorViewModel?,
+    inputAnchorPositions: MutableMap<Int, Offset>,
+    outputAnchorPositions: MutableMap<Int, Offset>,
+    onNodePositionChange: (Int, Offset) -> Unit
+) {
+    for (node in nodes) {
+        NodeItem(
+            nodeId = node.id,
+            nodePosition = node.position,
+            canvasOffset = canvasOffset,
+            name = node.name,
+            nodeDataType = node.nodeDataType,
+            vm = vm,
+            onInputAnchorCaptured = { anchor ->
+                inputAnchorPositions[node.id] = anchor
+            },
+            onOutputAnchorCaptured = { anchor ->
+                outputAnchorPositions[node.id] = anchor
             }
-        }
-
-        for (node in nodes) {
-            NodeItem(
-                nodeId = node.id,
-                nodePosition = node.position,
-                canvasOffset = canvasOffset,
-                name = node.name,
-                nodeDataType = node.nodeDataType,
-                vm = vm,
-                onInputAnchorCaptured = { anchor ->
-                    inputAnchorPositions[node.id] = anchor
-                },
-                onOutputAnchorCaptured = { anchor ->
-                    outputAnchorPositions[node.id] = anchor
-                }
-            ) { id, newPosition ->
-                onNodePositionChange(id, newPosition)
-            }
+        ) { id, newPosition ->
+            onNodePositionChange(id, newPosition)
         }
     }
 }
@@ -156,7 +139,7 @@ fun NodeItem(
     onPositionChange: (Int, Offset) -> Unit,
 ) {
     var localOffset by remember { mutableStateOf(nodePosition) }
-    val width = if(nodeDataType is NodeDataType.ColorNode) 220.dp else 120.dp
+    val width = if (nodeDataType is NodeDataType.ColorNode) 220.dp else 120.dp
 
     Row(
         modifier = Modifier
@@ -176,7 +159,7 @@ fun NodeItem(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if(nodeDataType.canInput) {
+        if (nodeDataType.canInput) {
             ConnectionPoint(
                 onPositionCaptured = onInputAnchorCaptured
             )
@@ -190,24 +173,23 @@ fun NodeItem(
                 .background(
                     color = getColorByNodeType(nodeDataType),
                     shape = RoundedCornerShape(8.dp)
-                )
-                ,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             NodeTitleItem(
                 title = name,
                 modifier = Modifier.weight(1f)
             )
-           if(nodeDataType is NodeDataType.ColorNode) {
-               NodeColorItem(
-                     initialColor = nodeDataType.color,
-                     onColorChange = { color ->
-                         vm?.onNodeColorChange(nodeId, color)
-                     }
-               )
-           }
+            if (nodeDataType is NodeDataType.ColorNode) {
+                NodeColorItem(
+                    initialColor = nodeDataType.color,
+                    onColorChange = { color ->
+                        vm?.onNodeColorChange(nodeId, color)
+                    }
+                )
+            }
         }
-        if(nodeDataType.canOutput) {
+        if (nodeDataType.canOutput) {
             ConnectionPoint(
                 onPositionCaptured = onOutputAnchorCaptured
             )
@@ -275,7 +257,9 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, shape = CircleShape)) {}
             }
         )
 
@@ -287,7 +271,9 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, shape = CircleShape)) {}
             }
         )
 
@@ -299,7 +285,9 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, shape = CircleShape)) {}
             }
         )
 
@@ -311,7 +299,9 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, shape = CircleShape)) {}
             }
         )
     }
@@ -336,13 +326,14 @@ fun ConnectionPoint(
     Box(
         modifier = modifier
             .size(16.dp)
-            .background(Color.White, shape = androidx.compose.foundation.shape.CircleShape)
+            .background(Color.White, shape = CircleShape)
             .padding(2.dp)
-            .background(color = color, shape = androidx.compose.foundation.shape.CircleShape)
+            .background(color = color, shape = CircleShape)
             .onGloballyPositioned { coordinates ->
                 // Use the parent-relative coordinate instead of the root.
                 val size = coordinates.size.toSize()
-                val anchor = coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
+                val anchor =
+                    coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
                 onPositionCaptured(anchor)
             }
     )
