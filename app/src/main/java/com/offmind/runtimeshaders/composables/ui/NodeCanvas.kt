@@ -3,7 +3,9 @@ package com.offmind.runtimeshaders.composables.ui
 import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +63,8 @@ fun NodeCanvas(
     nodes: List<NodeData> = emptyList(),
     connections: List<NodeConnection> = emptyList(),
     vm: NodeEditorViewModel? = null,
-    onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> }
+    onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> },
+    onDoubleTap: (Offset) -> Unit = {}
 ) {
     var canvasOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -73,6 +76,11 @@ fun NodeCanvas(
         modifier = modifier
             .background(color = Color.DarkGray)
             .pointerInput(Unit) {
+                detectTapGestures (
+                    onDoubleTap = { offset ->
+                        onDoubleTap(offset)
+                    },
+                )
                 detectDragGestures { change, dragAmount ->
                     canvasOffset += dragAmount
                     change.consume()

@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">RuntimeShaders</string>
+
+<!--    Node manage dialog-->
+    <string name="add_new_node">Add new node</string>
+    <string name="add_color_node">Add Color Node</string>
 </resources>

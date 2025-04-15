@@ -1,20 +1,18 @@
 package com.offmind.runtimeshaders.screens.editor
 
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotMutableState
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
-import com.offmind.runtimeshaders.screens.editor.model.AGVector3
+import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.AddUINodeItem
 import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
 import com.offmind.runtimeshaders.screens.editor.model.NodeData
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import org.w3c.dom.Node
 
 class NodeEditorViewModel : ViewModel() {
 
@@ -75,6 +73,20 @@ class NodeEditorViewModel : ViewModel() {
                 }
             }.toMutableStateList()
             state.copy(nodes = updatedNodes)
+        }
+    }
+
+    fun addNode(addUiNodeItem: AddUINodeItem) {
+        _state.update { state ->
+            val newNode = NodeData(
+                id = state.nodes.size,
+                name = addUiNodeItem.title,
+                position = Offset(10f, 50f), //todo decide position of new node
+                nodeDataType = addUiNodeItem.nodeData
+            )
+            val updatedNodes = state.nodes.toMutableList()
+            updatedNodes.add(newNode)
+            state.copy(nodes = updatedNodes.toMutableStateList())
         }
     }
 
