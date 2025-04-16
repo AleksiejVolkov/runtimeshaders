@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,14 +39,17 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.offmind.runtimeshaders.screens.editor.NodeEditorViewModel
+import com.offmind.runtimeshaders.screens.editor.model.Node
 import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
 import com.offmind.runtimeshaders.screens.editor.model.NodeData
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
+import com.offmind.runtimeshaders.screens.editor.model.Pin
+import com.offmind.runtimeshaders.screens.editor.model.PinType
 
 @Composable
 fun NodeCanvas(
     modifier: Modifier,
-    nodes: List<NodeData> = emptyList(),
+    nodes: List<Node> = emptyList(),
     connections: List<NodeConnection> = emptyList(),
     vm: NodeEditorViewModel? = null,
     onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> },
@@ -57,6 +61,37 @@ fun NodeCanvas(
     val outputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
     val inputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
 
+    CanvasWrapper(
+        modifier = modifier,
+        onDoubleTap = onDoubleTap,
+        offsetUpdated = { canvasOffset += it },
+    ) {
+        /* DrawConnectionLines(
+             connections = connections,
+             nodes = nodes,
+             outputAnchorPositions = outputAnchorPositions,
+             inputAnchorPositions = inputAnchorPositions,
+             canvasOffset = canvasOffset,
+         )*/
+
+        RenderNodes(
+            nodes = nodes,
+            canvasOffset = canvasOffset,
+            vm = vm,
+            inputAnchorPositions = inputAnchorPositions,
+            outputAnchorPositions = outputAnchorPositions,
+            onNodePositionChange = onNodePositionChange,
+        )
+    }
+}
+
+@Composable
+private fun CanvasWrapper(
+    modifier: Modifier,
+    onDoubleTap: (Offset) -> Unit = {},
+    offsetUpdated: (Offset) -> Unit = {},
+    content: @Composable () -> Unit,
+) {
     Box(
         modifier = modifier
             .background(color = Color.DarkGray)
@@ -70,7 +105,7 @@ fun NodeCanvas(
             }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
-                    canvasOffset += dragAmount
+                    offsetUpdated(dragAmount)
                     change.consume()
                 }
             }
@@ -78,28 +113,13 @@ fun NodeCanvas(
                 val size = it.size.toSize()
             }
     ) {
-        DrawConnectionLines(
-            connections = connections,
-            nodes = nodes,
-            outputAnchorPositions = outputAnchorPositions,
-            inputAnchorPositions = inputAnchorPositions,
-            canvasOffset = canvasOffset
-        )
-
-        RenderNodes(
-            nodes = nodes,
-            canvasOffset = canvasOffset,
-            vm = vm,
-            inputAnchorPositions = inputAnchorPositions,
-            outputAnchorPositions = outputAnchorPositions,
-            onNodePositionChange = onNodePositionChange
-        )
+        content()
     }
 }
 
 @Composable
 fun RenderNodes(
-    nodes: List<NodeData>,
+    nodes: List<Node>,
     canvasOffset: Offset,
     vm: NodeEditorViewModel?,
     inputAnchorPositions: MutableMap<Int, Offset>,
@@ -112,7 +132,7 @@ fun RenderNodes(
             nodePosition = node.position,
             canvasOffset = canvasOffset,
             name = node.name,
-            nodeDataType = node.nodeDataType,
+            pins = node.pins,
             vm = vm,
             onInputAnchorCaptured = { anchor ->
                 inputAnchorPositions[node.id] = anchor
@@ -132,14 +152,14 @@ fun NodeItem(
     nodePosition: Offset,
     canvasOffset: Offset,
     name: String,
-    nodeDataType: NodeDataType,
+    pins: List<Pin>,
     vm: NodeEditorViewModel? = null,
     onInputAnchorCaptured: (Offset) -> Unit = {},
     onOutputAnchorCaptured: (Offset) -> Unit = {},
     onPositionChange: (Int, Offset) -> Unit,
 ) {
     var localOffset by remember { mutableStateOf(nodePosition) }
-    val width = if (nodeDataType is NodeDataType.ColorNode) 220.dp else 120.dp
+    val width = 220.dp
 
     Row(
         modifier = Modifier
@@ -159,19 +179,19 @@ fun NodeItem(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (nodeDataType.canInput) {
-            ConnectionPoint(
-                onPositionCaptured = onInputAnchorCaptured
-            )
-        } else {
-            Spacer(modifier = Modifier.size(16.dp))
-        }
+        /* if (nodeDataType.canInput) {
+             ConnectionPoint(
+                 onPositionCaptured = onInputAnchorCaptured
+             )
+         } else {
+             Spacer(modifier = Modifier.size(16.dp))
+         }*/
         Column(
             modifier = Modifier
                 .shadow(4.dp)
                 .weight(1f)
                 .background(
-                    color = getColorByNodeType(nodeDataType),
+                    color = Color.Gray,
                     shape = RoundedCornerShape(8.dp)
                 ),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -180,18 +200,85 @@ fun NodeItem(
                 title = name,
                 modifier = Modifier.weight(1f)
             )
-            if (nodeDataType is NodeDataType.ColorNode) {
-                NodeColorItem(
-                    initialColor = nodeDataType.color,
-                    onColorChange = { color ->
-                        vm?.onNodeColorChange(nodeId, color)
-                    }
-                )
+            pins.forEach { pin ->
+                NodePinItem(pin = pin)
             }
         }
-        if (nodeDataType.canOutput) {
+        /*if (nodeDataType.canOutput) {
             ConnectionPoint(
                 onPositionCaptured = onOutputAnchorCaptured
+            )
+        } else {
+            Spacer(modifier = Modifier.size(16.dp))
+        }*/
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NodePinItem(pin: Pin) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (pin.canInput) {
+            ConnectionPoint(
+                color = Color.Blue,
+                onPositionCaptured = { /* Handle input anchor captured */ }
+            )
+        } else {
+            Spacer(modifier = Modifier.size(16.dp))
+        }
+        when (val data = pin.type) {
+            is PinType.FloatRangeType -> {
+                Column(modifier = Modifier.weight(1f)) {
+                    var pinValue by remember { mutableFloatStateOf(0f) }
+                    Text(text = "${pin.name}: ${"%.2f".format(pinValue)}", color = Color.White)
+                    Slider(
+                        value = pinValue,
+                        onValueChange = { pinValue = it },
+                        valueRange = data.min..data.max,
+                        modifier = Modifier.fillMaxWidth(),
+                        thumb = {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .background(Color.White, shape = CircleShape)
+                            ) {}
+                        }
+                    )
+                }
+            }
+
+            is PinType.Vec2Type -> {
+                Text("Vec2 Pin")
+            }
+
+            is PinType.Vec3Type -> {
+                Text("Vec3 Pin")
+            }
+
+            is PinType.Vec4Type -> {
+                Text("Vec4 Pin")
+            }
+
+            is PinType.IntType -> {
+                Text("Int Pin")
+            }
+
+            is PinType.BoolType -> {
+                Text("Bool Pin")
+            }
+
+            is PinType.StringType -> {
+                Text("String Pin")
+            }
+
+            is PinType.FloatType -> {
+                Text("Float Pin")
+            }
+        }
+        if (pin.canOutput) {
+            ConnectionPoint(
+                color = Color.Green,
+                onPositionCaptured = { /* Handle input anchor captured */ }
             )
         } else {
             Spacer(modifier = Modifier.size(16.dp))
@@ -257,9 +344,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier
-                    .size(20.dp)
-                    .background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -271,9 +360,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier
-                    .size(20.dp)
-                    .background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -285,9 +376,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier
-                    .size(20.dp)
-                    .background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -299,9 +392,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier
-                    .size(20.dp)
-                    .background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
     }

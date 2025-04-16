@@ -40,14 +40,12 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
 
     val colorNode = state.value.nodes.firstOrNull { it.nodeDataType is NodeDataType.ColorNode }
 
-    val color = (colorNode?.nodeDataType as NodeDataType.ColorNode).color
-
     Column {
         ShaderWindow(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.5f),
-            color = color
+            color = Color.Black,
         )
         Box(
             modifier = Modifier
@@ -57,7 +55,7 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
         ) {
             NodeCanvas(
                 modifier = Modifier.fillMaxSize(),
-                nodes = state.value.nodes,
+                nodes = state.value.nodes2,
                 vm = vm,
                 connections = state.value.connections,
                 onNodePositionChange = { id, position ->
