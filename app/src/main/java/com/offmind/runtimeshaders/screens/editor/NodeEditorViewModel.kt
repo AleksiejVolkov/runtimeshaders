@@ -91,7 +91,7 @@ class NodeEditorViewModel(
         _state.update { state ->
             val newNode = NodeData(
                 id = state.nodes.size,
-                name = addUiNodeItem.title,
+                name = "${addUiNodeItem.title} ${state.nodes.size}",
                 position = Offset(10f, 50f), //todo decide position of new node
                 nodeDataType = addUiNodeItem.nodeData
             )
