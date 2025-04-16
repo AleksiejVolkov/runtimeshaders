@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.offmind.runtimeshaders.composables.ShadedBox
 import com.offmind.runtimeshaders.composables.ui.NodeCanvas
 import com.offmind.runtimeshaders.screens.editor.dialog.DialogState
+import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.DeleteNodePopUp
 import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.ManageNodeBottomShitDialog
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
 import com.offmind.runtimeshaders.shaders.Shader
@@ -40,7 +41,7 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
 
     val colorNode = state.value.nodes.firstOrNull { it.nodeDataType is NodeDataType.ColorNode }
 
-    val color = (colorNode?.nodeDataType as NodeDataType.ColorNode).color
+    val color = (colorNode?.nodeDataType as? NodeDataType.ColorNode)?.color ?: Color.White
 
     Column {
         ShaderWindow(
@@ -65,6 +66,9 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                 },
                 onDoubleTap = {
                     dialogState = DialogState(true)
+                },
+                onLongPress = { _, node ->
+                    dialogState = DialogState(showDeleteNodeDialog = node)
                 }
             )
             Box(
@@ -90,6 +94,19 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
             },
             onAddNodeClicked = {
                 vm.addNode(it)
+                dialogState = DialogState()
+            }
+        )
+    }
+
+    dialogState.showDeleteNodeDialog?.let {
+        DeleteNodePopUp(
+            nodeData = it,
+            onDismiss = {
+                dialogState = DialogState()
+            },
+            onDeleteClicked = { nodeId ->
+                vm.deleteNode(nodeId)
                 dialogState = DialogState()
             }
         )

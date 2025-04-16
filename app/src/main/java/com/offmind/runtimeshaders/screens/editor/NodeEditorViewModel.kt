@@ -41,7 +41,7 @@ class NodeEditorViewModel(
         )
     )
 
-    private val connections: List<NodeConnection> = listOf(
+    private val connections = mutableStateListOf(
         NodeConnection(
             fromNode = 0,
             toNode = OUTPUT_NODE_ID,
@@ -74,7 +74,11 @@ class NodeEditorViewModel(
         _state.update { state ->
             val updatedNodes = state.nodes.map { node ->
                 if (node.id == nodeId) {
-                    node.copy(nodeDataType = (node.nodeDataType as NodeDataType.ColorNode).copy(color = newColor))
+                    node.copy(
+                        nodeDataType = (node.nodeDataType as NodeDataType.ColorNode).copy(
+                            color = newColor
+                        )
+                    )
                 } else {
                     node
                 }
@@ -97,9 +101,23 @@ class NodeEditorViewModel(
         }
     }
 
+    fun deleteNode(nodeId: Int) {
+        _state.update { state ->
+            val nodes = state.nodes.toMutableList()
+            val connections = state.connections.toMutableList()
+            val updatedNodes = nodes.filter { it.id != nodeId }
+            val updatedConnections =
+                connections.filter { it.fromNode != nodeId || it.toNode != nodeId }
+            state.copy(
+                nodes = updatedNodes.toMutableStateList(),
+                connections = updatedConnections.toMutableStateList()
+            )
+        }
+    }
+
 }
 
 data class NodeEditorState(
     val nodes: SnapshotStateList<NodeData> = mutableStateListOf(),
-    val connections: List<NodeConnection> = emptyList(),
+    val connections: SnapshotStateList<NodeConnection> = mutableStateListOf(),
 )
