@@ -41,7 +41,7 @@ class NodeEditorViewModel(
         )
     )
 
-    private val connections: List<NodeConnection> = listOf(
+    private val connections = mutableStateListOf(
         NodeConnection(
             fromNode = 0,
             toNode = OUTPUT_NODE_ID,
@@ -74,7 +74,11 @@ class NodeEditorViewModel(
         _state.update { state ->
             val updatedNodes = state.nodes.map { node ->
                 if (node.id == nodeId) {
-                    node.copy(nodeDataType = (node.nodeDataType as NodeDataType.ColorNode).copy(color = newColor))
+                    node.copy(
+                        nodeDataType = (node.nodeDataType as NodeDataType.ColorNode).copy(
+                            color = newColor
+                        )
+                    )
                 } else {
                     node
                 }
@@ -87,8 +91,8 @@ class NodeEditorViewModel(
         _state.update { state ->
             val newNode = NodeData(
                 id = state.nodes.size,
-                name = addUiNodeItem.title,
-                position = Offset(10f, 50f), //todo decide position of new node
+                name = "${addUiNodeItem.title} ${state.nodes.size}",
+                position = Offset( -state.cameraState.offset.x * state.cameraState.zoom, 50f),
                 nodeDataType = addUiNodeItem.nodeData
             )
             val updatedNodes = state.nodes.toMutableList()
@@ -97,9 +101,33 @@ class NodeEditorViewModel(
         }
     }
 
+    fun deleteNode(nodeId: Int) {
+        _state.update { state ->
+            val nodes = state.nodes.toMutableList()
+            val connections = state.connections.toMutableList()
+            val updatedNodes = nodes.filter { it.id != nodeId }
+            val updatedConnections =
+                connections.filter { it.fromNode != nodeId || it.toNode != nodeId }
+            state.copy(
+                nodes = updatedNodes.toMutableStateList(),
+                connections = updatedConnections.toMutableStateList()
+            )
+        }
+    }
+
+    fun onCanvasCameraStateChanged(cameraState: CameraState) {
+        _state.update { state -> state.copy(cameraState = cameraState) }
+    }
+
 }
 
 data class NodeEditorState(
     val nodes: SnapshotStateList<NodeData> = mutableStateListOf(),
-    val connections: List<NodeConnection> = emptyList(),
+    val connections: SnapshotStateList<NodeConnection> = mutableStateListOf(),
+    val cameraState: CameraState = CameraState()
+)
+
+data class CameraState(
+    val offset: Offset = Offset.Zero,
+    val zoom: Float = 1f
 )

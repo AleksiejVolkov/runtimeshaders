@@ -2,10 +2,11 @@ package com.offmind.runtimeshaders.composables.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,24 +26,28 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import com.offmind.runtimeshaders.screens.editor.CameraState
 import com.offmind.runtimeshaders.screens.editor.NodeEditorViewModel
 import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
 import com.offmind.runtimeshaders.screens.editor.model.NodeData
@@ -53,11 +58,20 @@ fun NodeCanvas(
     modifier: Modifier,
     nodes: List<NodeData> = emptyList(),
     connections: List<NodeConnection> = emptyList(),
+    cameraState: CameraState,
     vm: NodeEditorViewModel? = null,
     onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> },
-    onDoubleTap: (Offset) -> Unit = {}
+    onCameraStateChange: (CameraState) -> Unit = {},
+    onDoubleTap: (Offset) -> Unit = {},
+    onLongPress: (Offset, NodeData) -> Unit = { _, _ -> }
 ) {
-    var canvasOffset by remember { mutableStateOf(Offset.Zero) }
+    var canvasOffset by remember { mutableStateOf(cameraState.offset) }
+    var scale by remember { mutableFloatStateOf(cameraState.zoom) }
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.1f, 10f)
+        canvasOffset += panChange
+    }
+    val haptic = LocalHapticFeedback.current
 
     // Mutable maps for anchor positions:
     val outputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
@@ -66,32 +80,37 @@ fun NodeCanvas(
     Box(
         modifier = modifier
             .background(color = Color.DarkGray)
-            .scale(1f)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { offset ->
-                        onDoubleTap(offset)
-                    }
-                )
+                detectTapGestures(onDoubleTap = onDoubleTap)
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    canvasOffset += dragAmount
-                    change.consume()
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(0.1f, 10f)
+                    canvasOffset += pan
+                    onCameraStateChange(CameraState(canvasOffset, scale))
                 }
             }
-            .onGloballyPositioned {
-                val size = it.size.toSize()
-
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = canvasOffset.x
+                translationY = canvasOffset.y
             }
+            .transformable(state = transformState)
     ) {
         // Draw connection lines first
         Canvas(modifier = Modifier.fillMaxSize()) {
             connections.forEach { connection ->
                 // Use the captured anchor positions for output and input.
                 // Fallback to using your node position + an offset if not yet captured.
-                val startPoint = outputAnchorPositions[connection.fromNode]!! + nodes.find { it.id == connection.fromNode }!!.position + canvasOffset
-                 val endPoint = inputAnchorPositions[connection.toNode]!! + nodes.find { it.id == connection.toNode }!!.position +  canvasOffset
+                val outputAnchorPos = outputAnchorPositions[connection.fromNode] ?: return@Canvas
+                val fromNodePos =
+                    nodes.find { it.id == connection.fromNode }?.position ?: return@Canvas
+                val startPoint = outputAnchorPos + fromNodePos + canvasOffset
+
+                val inputAnchorPos = inputAnchorPositions[connection.toNode] ?: return@Canvas
+                val toNodePos = nodes.find { it.id == connection.toNode }?.position ?: return@Canvas
+                val endPoint = inputAnchorPos + toNodePos + canvasOffset
 
                 // Define a horizontal offset for the control points.
                 // You might want to adjust these values based on your UI needs.
@@ -135,6 +154,10 @@ fun NodeCanvas(
                 },
                 onOutputAnchorCaptured = { anchor ->
                     outputAnchorPositions[node.id] = anchor
+                },
+                onLongPress = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress(it, node)
                 }
             ) { id, newPosition ->
                 onNodePositionChange(id, newPosition)
@@ -153,10 +176,11 @@ fun NodeItem(
     vm: NodeEditorViewModel? = null,
     onInputAnchorCaptured: (Offset) -> Unit = {},
     onOutputAnchorCaptured: (Offset) -> Unit = {},
+    onLongPress: (Offset) -> Unit = {},
     onPositionChange: (Int, Offset) -> Unit,
 ) {
     var localOffset by remember { mutableStateOf(nodePosition) }
-    val width = if(nodeDataType is NodeDataType.ColorNode) 220.dp else 120.dp
+    val width = if (nodeDataType is NodeDataType.ColorNode) 220.dp else 120.dp
 
     Row(
         modifier = Modifier
@@ -173,10 +197,17 @@ fun NodeItem(
                     onPositionChange(nodeId, localOffset)
                     change.consume()
                 }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        onLongPress(localOffset)
+                    }
+                )
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if(nodeDataType.canInput) {
+        if (nodeDataType.canInput) {
             ConnectionPoint(
                 onPositionCaptured = onInputAnchorCaptured
             )
@@ -190,24 +221,23 @@ fun NodeItem(
                 .background(
                     color = getColorByNodeType(nodeDataType),
                     shape = RoundedCornerShape(8.dp)
-                )
-                ,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             NodeTitleItem(
                 title = name,
                 modifier = Modifier.weight(1f)
             )
-           if(nodeDataType is NodeDataType.ColorNode) {
-               NodeColorItem(
-                     initialColor = nodeDataType.color,
-                     onColorChange = { color ->
-                         vm?.onNodeColorChange(nodeId, color)
-                     }
-               )
-           }
+            if (nodeDataType is NodeDataType.ColorNode) {
+                NodeColorItem(
+                    initialColor = nodeDataType.color,
+                    onColorChange = { color ->
+                        vm?.onNodeColorChange(nodeId, color)
+                    }
+                )
+            }
         }
-        if(nodeDataType.canOutput) {
+        if (nodeDataType.canOutput) {
             ConnectionPoint(
                 onPositionCaptured = onOutputAnchorCaptured
             )
@@ -275,7 +305,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -287,7 +321,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -299,7 +337,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
 
@@ -311,7 +353,11 @@ fun NodeColorItem(
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth(),
             thumb = {
-                Box(modifier = Modifier.size(20.dp).background(Color.White, shape = CircleShape)) {}
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {}
             }
         )
     }
@@ -342,7 +388,8 @@ fun ConnectionPoint(
             .onGloballyPositioned { coordinates ->
                 // Use the parent-relative coordinate instead of the root.
                 val size = coordinates.size.toSize()
-                val anchor = coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
+                val anchor =
+                    coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
                 onPositionCaptured(anchor)
             }
     )
