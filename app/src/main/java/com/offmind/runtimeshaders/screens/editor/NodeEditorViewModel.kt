@@ -1,9 +1,11 @@
 package com.offmind.runtimeshaders.screens.editor
 
+import android.content.res.Resources
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.AddUINodeItem
@@ -16,6 +18,7 @@ import com.offmind.runtimeshaders.screens.editor.model.NodeType
 import com.offmind.runtimeshaders.screens.editor.model.NodeUiData
 import com.offmind.runtimeshaders.screens.editor.model.Pin
 import com.offmind.runtimeshaders.screens.editor.model.PinType
+import com.offmind.runtimeshaders.screens.editor.model.toNodeType
 import com.offmind.runtimeshaders.screens.editor.usecase.NodesToCodeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -142,6 +145,13 @@ class NodeEditorViewModel(
         ),
     )
 
+    private val connections = mutableStateListOf(
+        NodeConnection(
+            fromNode = 0,
+            toNode = OUTPUT_NODE_ID,
+        )
+    )
+
     init {
         _state.update {
             it.copy(nodes2 = nodes)
@@ -180,22 +190,72 @@ class NodeEditorViewModel(
 
     fun addNode(addUiNodeItem: AddUINodeItem) {
         _state.update { state ->
-            val newNode = NodeData(
-                id = state.nodes.size,
-                name = addUiNodeItem.title,
-                position = Offset(10f, 50f), //todo decide position of new node
-                nodeDataType = addUiNodeItem.nodeData
+            val density = Resources.getSystem().displayMetrics.density
+            val offsetXInDp = state.cameraState.offset.x * density
+            val offsetYInDp = state.cameraState.offset.y * density
+
+            val pos = Offset(
+                x = state.cameraState.canvasSize.width * 0.25f - offsetXInDp,
+                y = 10f*density + offsetYInDp,
             )
-            val updatedNodes = state.nodes.toMutableList()
-            updatedNodes.add(newNode)
-            state.copy(nodes = updatedNodes.toMutableStateList())
+            val newNode2 = Node(
+                id = state.nodes.size,
+                name = "${addUiNodeItem.title} ${state.nodes.size}",
+                position = pos,
+                type = addUiNodeItem.nodeData.toNodeType(),
+                pins = emptyList(),
+                uiData = NodeUiData(pos)
+            )
+            val updateNodes2 = state.nodes2.toMutableList()
+            updateNodes2.add(newNode2)
+
+            state.copy(nodes2 = updateNodes2.toMutableStateList())
         }
     }
+
+    fun updateCanvasSize(newSize: Size) {
+        _state.update {
+            it.copy(
+                cameraState = it.cameraState.copy(
+                    canvasSize = newSize
+                )
+            )
+        }
+    }
+
+    fun deleteNode(nodeId: Int) {
+        _state.update { state ->
+            val nodes = state.nodes.toMutableList()
+            val nodes2 = state.nodes2.toMutableList()
+            val connections = state.connections.toMutableList()
+            val updatedNodes = nodes.filter { it.id != nodeId }
+            val updatedNodes2 = nodes2.filter { it.id != nodeId }
+            val updatedConnections =
+                connections.filter { it.fromNode != nodeId || it.toNode != nodeId }
+            state.copy(
+                nodes = updatedNodes.toMutableStateList(),
+                connections = updatedConnections.toMutableStateList(),
+                nodes2 = updatedNodes2.toMutableStateList(),
+            )
+        }
+    }
+
+    fun onCanvasCameraStateChanged(cameraState: CameraState) {
+        _state.update { state -> state.copy(cameraState = cameraState) }
+    }
+
 }
+
+data class CameraState(
+    val offset: Offset = Offset.Zero,
+    val zoom: Float = 1f,
+    val canvasSize: Size = Size.Zero,
+)
 
 data class NodeEditorState(
     val nodes: SnapshotStateList<NodeData> = mutableStateListOf(),
-    val nodes2: SnapshotStateList<Node> = mutableStateListOf(),
-    val connections: List<NodeConnection> = emptyList(),
+    val connections: SnapshotStateList<NodeConnection> = mutableStateListOf(),
+    val cameraState: CameraState = CameraState(),
     val connections2: List<Connection> = emptyList(),
+    val nodes2: SnapshotStateList<Node> = mutableStateListOf(),
 )

@@ -3,6 +3,9 @@ package com.offmind.runtimeshaders.composables.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,20 +31,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import com.offmind.runtimeshaders.screens.editor.CameraState
 import com.offmind.runtimeshaders.screens.editor.NodeEditorViewModel
 import com.offmind.runtimeshaders.screens.editor.model.Node
 import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
-import com.offmind.runtimeshaders.screens.editor.model.NodeData
 import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
 import com.offmind.runtimeshaders.screens.editor.model.Pin
 import com.offmind.runtimeshaders.screens.editor.model.PinType
@@ -51,20 +56,31 @@ fun NodeCanvas(
     modifier: Modifier,
     nodes: List<Node> = emptyList(),
     connections: List<NodeConnection> = emptyList(),
+    cameraState: CameraState,
     vm: NodeEditorViewModel? = null,
     onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> },
-    onDoubleTap: (Offset) -> Unit = {}
+    onCameraStateChange: (CameraState) -> Unit = {},
+    onDoubleTap: (Offset) -> Unit = {},
+    onLongPress: (Offset, Node) -> Unit = { _, _ -> }
 ) {
-    var canvasOffset by remember { mutableStateOf(Offset.Zero) }
+    var canvasOffset by remember { mutableStateOf(cameraState.offset) }
 
     // Mutable maps for anchor positions:
     val outputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
     val inputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
 
     CanvasWrapper(
-        modifier = modifier,
+        modifier = modifier
+            .onGloballyPositioned {
+                vm?.updateCanvasSize(it.size.toSize())
+            },
         onDoubleTap = onDoubleTap,
-        offsetUpdated = { canvasOffset += it },
+        canvasOffset = canvasOffset,
+        cameraState = cameraState,
+        offsetUpdated = { offset, scale ->
+            canvasOffset += offset
+            onCameraStateChange(CameraState(canvasOffset, scale))
+        },
     ) {
         /* DrawConnectionLines(
              connections = connections,
@@ -78,6 +94,7 @@ fun NodeCanvas(
             nodes = nodes,
             canvasOffset = canvasOffset,
             vm = vm,
+            onLongPress = onLongPress,
             inputAnchorPositions = inputAnchorPositions,
             outputAnchorPositions = outputAnchorPositions,
             onNodePositionChange = onNodePositionChange,
@@ -88,30 +105,37 @@ fun NodeCanvas(
 @Composable
 private fun CanvasWrapper(
     modifier: Modifier,
+    canvasOffset: Offset,
+    cameraState: CameraState,
     onDoubleTap: (Offset) -> Unit = {},
-    offsetUpdated: (Offset) -> Unit = {},
+    offsetUpdated: (Offset, Float) -> Unit = {_, _ -> },
     content: @Composable () -> Unit,
 ) {
+    var scale by remember { mutableFloatStateOf(cameraState.zoom) }
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.1f, 10f)
+        offsetUpdated(panChange, scale)
+    }
+
     Box(
         modifier = modifier
             .background(color = Color.DarkGray)
-            .scale(1f)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { offset ->
-                        onDoubleTap(offset)
-                    }
-                )
+                detectTapGestures(onDoubleTap = onDoubleTap)
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    offsetUpdated(dragAmount)
-                    change.consume()
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(0.1f, 10f)
+                    offsetUpdated(pan, scale)
                 }
             }
-            .onGloballyPositioned {
-                val size = it.size.toSize()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = canvasOffset.x
+                translationY = canvasOffset.y
             }
+            .transformable(state = transformState)
     ) {
         content()
     }
@@ -124,8 +148,11 @@ fun RenderNodes(
     vm: NodeEditorViewModel?,
     inputAnchorPositions: MutableMap<Int, Offset>,
     outputAnchorPositions: MutableMap<Int, Offset>,
-    onNodePositionChange: (Int, Offset) -> Unit
+    onNodePositionChange: (Int, Offset) -> Unit,
+    onLongPress: (Offset, Node) -> Unit = { _, _ -> },
 ) {
+    val haptic = LocalHapticFeedback.current
+
     for (node in nodes) {
         NodeItem(
             nodeId = node.id,
@@ -139,8 +166,11 @@ fun RenderNodes(
             },
             onOutputAnchorCaptured = { anchor ->
                 outputAnchorPositions[node.id] = anchor
-            }
-        ) { id, newPosition ->
+            },
+            onLongPress = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongPress(it, node)
+            }) { id, newPosition ->
             onNodePositionChange(id, newPosition)
         }
     }
@@ -156,6 +186,7 @@ fun NodeItem(
     vm: NodeEditorViewModel? = null,
     onInputAnchorCaptured: (Offset) -> Unit = {},
     onOutputAnchorCaptured: (Offset) -> Unit = {},
+    onLongPress: (Offset) -> Unit = {},
     onPositionChange: (Int, Offset) -> Unit,
 ) {
     var localOffset by remember { mutableStateOf(nodePosition) }
@@ -176,6 +207,13 @@ fun NodeItem(
                     onPositionChange(nodeId, localOffset)
                     change.consume()
                 }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        onLongPress(localOffset)
+                    }
+                )
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {

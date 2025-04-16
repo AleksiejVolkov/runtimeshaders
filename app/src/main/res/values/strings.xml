@@ -4,4 +4,16 @@
 <!--    Node manage dialog-->
     <string name="add_new_node">Add new node</string>
     <string name="add_color_node">Add Color Node</string>
+    <string name="do_you_want_delete_node">Do you want to delete node %s ?</string>
+
+<!--    Common-->
+    <string name="common_yes">Yes</string>
+    <string name="common_no">No</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_save">Save</string>
+    <string name="common_close">Close</string>
+    <string name="common_name">Name</string>
 </resources>

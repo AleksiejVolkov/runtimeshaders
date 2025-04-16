@@ -23,6 +23,16 @@ sealed class NodeDataType(val canInput: Boolean, val canOutput: Boolean) {
     data class ColorNode(val color: Color) : NodeDataType(canInput = false, canOutput = true)
 }
 
+fun NodeDataType.toNodeType(): NodeType {
+    return when (this) {
+        is NodeDataType.InputNode -> NodeType.OUTPUT
+        is NodeDataType.UVNode -> NodeType.VEC4
+        is NodeDataType.LengthNode -> NodeType.FLOAT
+        is NodeDataType.OutputNode -> NodeType.OUTPUT
+        is NodeDataType.ColorNode -> NodeType.COLOR
+    }
+}
+
 data class AGVector3(
     val x: Float,
     val y: Float,
