@@ -61,8 +61,12 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                 nodes = state.value.nodes,
                 vm = vm,
                 connections = state.value.connections,
+                cameraState = state.value.cameraState,
                 onNodePositionChange = { id, position ->
                     vm.onNodePositionChange(id, position)
+                },
+                onCameraStateChange = {
+                    vm.onCanvasCameraStateChanged(it)
                 },
                 onDoubleTap = {
                     dialogState = DialogState(true)

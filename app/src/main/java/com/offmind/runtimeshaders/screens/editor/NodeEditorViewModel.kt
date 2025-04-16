@@ -92,7 +92,7 @@ class NodeEditorViewModel(
             val newNode = NodeData(
                 id = state.nodes.size,
                 name = "${addUiNodeItem.title} ${state.nodes.size}",
-                position = Offset(10f, 50f), //todo decide position of new node
+                position = Offset( -state.cameraState.offset.x * state.cameraState.zoom, 50f),
                 nodeDataType = addUiNodeItem.nodeData
             )
             val updatedNodes = state.nodes.toMutableList()
@@ -115,9 +115,19 @@ class NodeEditorViewModel(
         }
     }
 
+    fun onCanvasCameraStateChanged(cameraState: CameraState) {
+        _state.update { state -> state.copy(cameraState = cameraState) }
+    }
+
 }
 
 data class NodeEditorState(
     val nodes: SnapshotStateList<NodeData> = mutableStateListOf(),
     val connections: SnapshotStateList<NodeConnection> = mutableStateListOf(),
+    val cameraState: CameraState = CameraState()
+)
+
+data class CameraState(
+    val offset: Offset = Offset.Zero,
+    val zoom: Float = 1f
 )
