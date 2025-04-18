@@ -22,32 +22,23 @@ class NodeEditorViewModel(
     private val _state: MutableStateFlow<NodeEditorState> = MutableStateFlow(NodeEditorState())
     val state: StateFlow<NodeEditorState> = _state
 
-    companion object {
-        const val OUTPUT_NODE_ID = -1
-    }
-
     init {
         _state.update {
-            it.copy(nodes2 = nodes, connections2 = connections)
+            it.copy(nodes = nodes, connections = connections)
         }
-
-        // Run test to verify NodesToCodeUseCase changes
-        com.offmind.runtimeshaders.screens.editor.usecase.TestNodesToCodeUseCase.runTest()
-
-        // Update shader after test
         updateShader()
     }
 
     fun onNodePositionChange(nodeId: Int, newPosition: Offset) {
         _state.update { state ->
-            val updatedNodes2 = state.nodes2.map { node ->
+            val updatedNodes2 = state.nodes.map { node ->
                 if (node.id == nodeId) {
                     node.copy(uiData = NodeUiData(position = newPosition))
                 } else {
                     node
                 }
             }.toMutableStateList()
-            state.copy(nodes2 = updatedNodes2)
+            state.copy(nodes = updatedNodes2)
         }
     }
 
@@ -68,10 +59,10 @@ class NodeEditorViewModel(
                 pins = emptyList(),
                 uiData = NodeUiData(pos)
             )
-            val updateNodes2 = state.nodes2.toMutableList()
+            val updateNodes2 = state.nodes.toMutableList()
             updateNodes2.add(newNode2)
 
-            state.copy(nodes2 = updateNodes2.toMutableStateList())
+            state.copy(nodes = updateNodes2.toMutableStateList())
         }
     }
 
@@ -87,17 +78,14 @@ class NodeEditorViewModel(
 
     fun deleteNode(nodeId: Int) {
         _state.update { state ->
-            val nodes = state.nodes.toMutableList()
-            val nodes2 = state.nodes2.toMutableList()
+            val nodes2 = state.nodes.toMutableList()
             val connections = state.connections.toMutableList()
-            val updatedNodes = nodes.filter { it.id != nodeId }
             val updatedNodes2 = nodes2.filter { it.id != nodeId }
             val updatedConnections =
-                connections.filter { it.fromNode != nodeId || it.toNode != nodeId }
+                connections.filter { it.fromPin.parentId != nodeId || it.toPin.parentId != nodeId }
             state.copy(
-                nodes = updatedNodes.toMutableStateList(),
-                connections = updatedConnections.toMutableStateList(),
-                nodes2 = updatedNodes2.toMutableStateList(),
+                nodes = updatedNodes2.toMutableStateList(),
+                connections = updatedConnections.toMutableStateList()
             )
         }
     }
@@ -117,14 +105,14 @@ class NodeEditorViewModel(
     fun updateShader() {
         _state.update { state ->
             state.copy(
-                shaderCode = nodesToCodeUseCase.invoke(state.nodes2, state.connections2)
+                shaderCode = nodesToCodeUseCase.invoke(state.nodes, state.connections)
             )
         }
     }
 
     fun onPinUpdated(pin: Pin) {
         _state.update { state ->
-            val updatedNodes2 = state.nodes2.map { node ->
+            val updatedNodes2 = state.nodes.map { node ->
                 if (node.id == pin.parentId) {
                     val updatedPins = node.pins.map { existingPin ->
                         if (existingPin.id == pin.id) {
@@ -138,7 +126,7 @@ class NodeEditorViewModel(
                     node
                 }
             }.toMutableStateList()
-            state.copy(nodes2 = updatedNodes2)
+            state.copy(nodes = updatedNodes2)
         }
         updateShader()
     }
@@ -152,10 +140,8 @@ data class CameraState(
 )
 
 data class NodeEditorState(
-    val nodes: SnapshotStateList<NodeData> = mutableStateListOf(),
-    val connections: SnapshotStateList<NodeConnection> = mutableStateListOf(),
     val cameraState: CameraState = CameraState(),
-    val connections2: List<Connection> = emptyList(),
-    val nodes2: SnapshotStateList<Node> = mutableStateListOf(),
+    val connections: List<Connection> = emptyList(),
+    val nodes: SnapshotStateList<Node> = mutableStateListOf(),
     val shaderCode: String = "",
 )

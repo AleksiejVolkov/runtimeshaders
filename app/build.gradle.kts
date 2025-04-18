@@ -72,4 +72,5 @@ dependencies {
     implementation("io.insert-koin:koin-compose:4.0.3")
     implementation("io.insert-koin:koin-compose-viewmodel:4.0.3")
     implementation("io.insert-koin:koin-compose-viewmodel-navigation:4.0.3")
+    testImplementation(kotlin("test"))
 }

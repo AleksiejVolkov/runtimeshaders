@@ -39,8 +39,6 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
     val state = vm.state.collectAsState()
     var dialogState by remember { mutableStateOf(DialogState(false)) }
 
-    val colorNode = state.value.nodes.firstOrNull { it.nodeDataType is NodeDataType.ColorNode }
-
     Column {
         ShaderWindow(
             modifier = Modifier
@@ -57,9 +55,9 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
         ) {
             NodeCanvas(
                 modifier = Modifier.fillMaxSize(),
-                nodes = state.value.nodes2,
+                nodes = state.value.nodes,
                 vm = vm,
-                connections = state.value.connections2,
+                connections = state.value.connections,
                 cameraState = state.value.cameraState,
                 onNodePositionChange = { id, position ->
                     vm.onNodePositionChange(id, position)

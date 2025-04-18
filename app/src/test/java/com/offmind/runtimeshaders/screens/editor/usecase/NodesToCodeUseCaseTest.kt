@@ -8,8 +8,6 @@ import com.offmind.runtimeshaders.screens.editor.model.Pin
 import com.offmind.runtimeshaders.screens.editor.model.PinType
 import com.offmind.runtimeshaders.screens.editor.model.PinValue
 import androidx.compose.ui.geometry.Offset
-import org.junit.Assert.assertEquals
-import org.junit.Test
 
 class NodesToCodeUseCaseTest {
 

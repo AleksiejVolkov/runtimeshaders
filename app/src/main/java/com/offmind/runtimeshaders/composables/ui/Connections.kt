@@ -30,7 +30,6 @@ fun DrawPinConnectionLines(
             val fromPinPosition = outputPinPositions[connection.fromPin]
             val toPinPosition = inputPinPositions[connection.toPin]
 
-            println("HUI fromPinPosition ${nodes.find { it.id == connection.fromPin.parentId }!!.uiData.position}")
             if (fromPinPosition != null && toPinPosition != null) {
                 val startPoint = fromPinPosition + nodes.find { it.id == connection.fromPin.parentId }!!.uiData.position + canvasOffset
                 val endPoint = toPinPosition + nodes.find { it.id == connection.toPin.parentId }!!.uiData.position + canvasOffset
