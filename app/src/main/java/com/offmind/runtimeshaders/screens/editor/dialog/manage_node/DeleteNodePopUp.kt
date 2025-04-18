@@ -98,7 +98,6 @@ fun DeleteNodePopUpPreview() {
             nodeData = Node(
                 id = 0,
                 name = "SomeName",
-                position = Offset.Zero,
                 pins = emptyList(),
                 uiData = NodeUiData(Offset.Zero),
                 type = NodeType.COLOR,

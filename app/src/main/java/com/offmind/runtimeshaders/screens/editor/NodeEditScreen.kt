@@ -47,6 +47,7 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                 .fillMaxWidth()
                 .weight(0.5f),
             color = Color.Black,
+            shader = state.value.shaderCode,
         )
         Box(
             modifier = Modifier
@@ -58,7 +59,7 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
                 modifier = Modifier.fillMaxSize(),
                 nodes = state.value.nodes2,
                 vm = vm,
-                connections = state.value.connections,
+                connections = state.value.connections2,
                 cameraState = state.value.cameraState,
                 onNodePositionChange = { id, position ->
                     vm.onNodePositionChange(id, position)
@@ -119,13 +120,14 @@ fun NodeEditScreen(paddingValues: PaddingValues) {
 @Composable
 fun ShaderWindow(
     modifier: Modifier,
-    color: Color
+    color: Color,
+    shader: String,
 ) {
-    val shader = remember {
-        Shader(circle).getRuntimeShader()
+
+    val shader = remember(shader) {
+        Shader(shader.ifEmpty { circle }).getRuntimeShader()
     }
 
-    println("color: $color")
     Box(
         modifier = modifier
             .padding(PaddingValues(0.dp))
@@ -134,9 +136,6 @@ fun ShaderWindow(
     ) {
         ShadedBox(
             shader = shader,
-            shaderUniforms = mapOf(
-                "inputColor" to color.toVec4Type()
-            )
         ) {
             Box(
                 modifier = Modifier
@@ -148,14 +147,11 @@ fun ShaderWindow(
     }
 }
 
-val circle = """
-    
-   uniform vec4 inputColor;
-    
+val circle = """ 
    vec4 main(float2 fragCoord) {
         float2 uv = NormalizeCoordinates(fragCoord, resolution);
         
         float r = length(uv);      
-        return inputColor*inputColor.a;
+        return vec4(0.);
    }
 """.trimIndent()

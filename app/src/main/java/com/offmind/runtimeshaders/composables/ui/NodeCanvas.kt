@@ -39,6 +39,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -46,16 +47,16 @@ import androidx.compose.ui.unit.toSize
 import com.offmind.runtimeshaders.screens.editor.CameraState
 import com.offmind.runtimeshaders.screens.editor.NodeEditorViewModel
 import com.offmind.runtimeshaders.screens.editor.model.Node
-import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
-import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
+import com.offmind.runtimeshaders.screens.editor.model.Connection
 import com.offmind.runtimeshaders.screens.editor.model.Pin
 import com.offmind.runtimeshaders.screens.editor.model.PinType
+import com.offmind.runtimeshaders.screens.editor.model.PinValue
 
 @Composable
 fun NodeCanvas(
     modifier: Modifier,
     nodes: List<Node> = emptyList(),
-    connections: List<NodeConnection> = emptyList(),
+    connections: List<Connection> = emptyList(),
     cameraState: CameraState,
     vm: NodeEditorViewModel? = null,
     onNodePositionChange: (Int, Offset) -> Unit = { _, _ -> },
@@ -65,9 +66,9 @@ fun NodeCanvas(
 ) {
     var canvasOffset by remember { mutableStateOf(cameraState.offset) }
 
-    // Mutable maps for anchor positions:
-    val outputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
-    val inputAnchorPositions = remember { mutableStateMapOf<Int, Offset>() }
+    // Mutable map for pin positions:
+    val outputPinPositions = remember { mutableStateMapOf<Connection.PinConnectionItem, Offset>() }
+    val inputPinPositions = remember { mutableStateMapOf<Connection.PinConnectionItem, Offset>() }
 
     CanvasWrapper(
         modifier = modifier
@@ -82,22 +83,22 @@ fun NodeCanvas(
             onCameraStateChange(CameraState(canvasOffset, scale))
         },
     ) {
-        /* DrawConnectionLines(
-             connections = connections,
-             nodes = nodes,
-             outputAnchorPositions = outputAnchorPositions,
-             inputAnchorPositions = inputAnchorPositions,
-             canvasOffset = canvasOffset,
-         )*/
-
         RenderNodes(
             nodes = nodes,
             canvasOffset = canvasOffset,
             vm = vm,
+            outputPinPositions = outputPinPositions,
+            inputPinPositions = inputPinPositions,
             onLongPress = onLongPress,
-            inputAnchorPositions = inputAnchorPositions,
-            outputAnchorPositions = outputAnchorPositions,
             onNodePositionChange = onNodePositionChange,
+        )
+
+        DrawPinConnectionLines(
+            connections = connections,
+            inputPinPositions = inputPinPositions,
+            outputPinPositions = outputPinPositions,
+            nodes = nodes,
+            canvasOffset = canvasOffset,
         )
     }
 }
@@ -108,7 +109,7 @@ private fun CanvasWrapper(
     canvasOffset: Offset,
     cameraState: CameraState,
     onDoubleTap: (Offset) -> Unit = {},
-    offsetUpdated: (Offset, Float) -> Unit = {_, _ -> },
+    offsetUpdated: (Offset, Float) -> Unit = { _, _ -> },
     content: @Composable () -> Unit,
 ) {
     var scale by remember { mutableFloatStateOf(cameraState.zoom) }
@@ -146,8 +147,8 @@ fun RenderNodes(
     nodes: List<Node>,
     canvasOffset: Offset,
     vm: NodeEditorViewModel?,
-    inputAnchorPositions: MutableMap<Int, Offset>,
-    outputAnchorPositions: MutableMap<Int, Offset>,
+    outputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
+    inputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
     onNodePositionChange: (Int, Offset) -> Unit,
     onLongPress: (Offset, Node) -> Unit = { _, _ -> },
 ) {
@@ -156,17 +157,13 @@ fun RenderNodes(
     for (node in nodes) {
         NodeItem(
             nodeId = node.id,
-            nodePosition = node.position,
+            nodePosition = node.uiData.position,
             canvasOffset = canvasOffset,
             name = node.name,
             pins = node.pins,
             vm = vm,
-            onInputAnchorCaptured = { anchor ->
-                inputAnchorPositions[node.id] = anchor
-            },
-            onOutputAnchorCaptured = { anchor ->
-                outputAnchorPositions[node.id] = anchor
-            },
+            outputPinPositions = outputPinPositions,
+            inputPinPositions = inputPinPositions,
             onLongPress = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onLongPress(it, node)
@@ -184,8 +181,8 @@ fun NodeItem(
     name: String,
     pins: List<Pin>,
     vm: NodeEditorViewModel? = null,
-    onInputAnchorCaptured: (Offset) -> Unit = {},
-    onOutputAnchorCaptured: (Offset) -> Unit = {},
+    outputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
+    inputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
     onLongPress: (Offset) -> Unit = {},
     onPositionChange: (Int, Offset) -> Unit,
 ) {
@@ -196,8 +193,8 @@ fun NodeItem(
         modifier = Modifier
             .offset {
                 IntOffset(
-                    (localOffset.x + canvasOffset.x).toInt(),
-                    (localOffset.y + canvasOffset.y).toInt()
+                    (localOffset.x).toInt(),
+                    (localOffset.y).toInt()
                 )
             }
             .width(width)
@@ -217,13 +214,6 @@ fun NodeItem(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        /* if (nodeDataType.canInput) {
-             ConnectionPoint(
-                 onPositionCaptured = onInputAnchorCaptured
-             )
-         } else {
-             Spacer(modifier = Modifier.size(16.dp))
-         }*/
         Column(
             modifier = Modifier
                 .shadow(4.dp)
@@ -239,27 +229,33 @@ fun NodeItem(
                 modifier = Modifier.weight(1f)
             )
             pins.forEach { pin ->
-                NodePinItem(pin = pin)
+                NodePinItem(
+                    pin = pin,
+                    outputPinPositions = outputPinPositions,
+                    inputPinPositions = inputPinPositions,
+                ) {
+                    vm?.onPinUpdated(it)
+                }
             }
         }
-        /*if (nodeDataType.canOutput) {
-            ConnectionPoint(
-                onPositionCaptured = onOutputAnchorCaptured
-            )
-        } else {
-            Spacer(modifier = Modifier.size(16.dp))
-        }*/
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NodePinItem(pin: Pin) {
+fun NodePinItem(
+    pin: Pin,
+    outputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
+    inputPinPositions: MutableMap<Connection.PinConnectionItem, Offset>,
+    onPinUpdated: (Pin) -> Unit = {}
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (pin.canInput) {
             ConnectionPoint(
                 color = Color.Blue,
-                onPositionCaptured = { /* Handle input anchor captured */ }
+                onPositionCaptured = { position ->
+                    inputPinPositions[Connection.PinConnectionItem(pin.parentId, pin.id)] = position
+                }
             )
         } else {
             Spacer(modifier = Modifier.size(16.dp))
@@ -267,21 +263,26 @@ fun NodePinItem(pin: Pin) {
         when (val data = pin.type) {
             is PinType.FloatRangeType -> {
                 Column(modifier = Modifier.weight(1f)) {
-                    var pinValue by remember { mutableFloatStateOf(0f) }
-                    Text(text = "${pin.name}: ${"%.2f".format(pinValue)}", color = Color.White)
-                    Slider(
-                        value = pinValue,
-                        onValueChange = { pinValue = it },
-                        valueRange = data.min..data.max,
-                        modifier = Modifier.fillMaxWidth(),
-                        thumb = {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .background(Color.White, shape = CircleShape)
-                            ) {}
-                        }
-                    )
+                    if(pin.value != null) {
+                        var pinValue by remember { mutableFloatStateOf((pin.value as PinValue.FloatRangeValue).value) }
+                        Text(text = "${pin.name}: ${"%.2f".format(pinValue)}", color = Color.White)
+                        Slider(
+                            value = pinValue,
+                            onValueChange = {
+                                pinValue = it
+                                onPinUpdated(pin.copy(value = PinValue.FloatRangeValue(pinValue)))
+                            },
+                            valueRange = data.min..data.max,
+                            modifier = Modifier.fillMaxWidth(),
+                            thumb = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .background(Color.White, shape = CircleShape)
+                                ) {}
+                            }
+                        )
+                    }
                 }
             }
 
@@ -316,7 +317,9 @@ fun NodePinItem(pin: Pin) {
         if (pin.canOutput) {
             ConnectionPoint(
                 color = Color.Green,
-                onPositionCaptured = { /* Handle input anchor captured */ }
+                onPositionCaptured = { position ->
+                    outputPinPositions[Connection.PinConnectionItem(pin.parentId, pin.id)] = position
+                }
             )
         } else {
             Spacer(modifier = Modifier.size(16.dp))
@@ -341,115 +344,6 @@ fun NodeTitleItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NodeColorItem(
-    modifier: Modifier = Modifier,
-    initialColor: Color = Color.White,
-    onColorChange: (Color) -> Unit = {}  // Callback so you can update your node data model if needed
-) {
-    // Create mutable state variables for each color component.
-    // These values are stored between recompositions.
-    var red by remember { mutableStateOf(initialColor.red) }
-    var green by remember { mutableStateOf(initialColor.green) }
-    var blue by remember { mutableStateOf(initialColor.blue) }
-    var alpha by remember { mutableStateOf(initialColor.alpha) }
-
-    // Whenever any color component changes, notify the parent.
-    LaunchedEffect(red, green, blue, alpha) {
-        onColorChange(Color(red, green, blue, alpha))
-    }
-
-    Column(
-        modifier = modifier.padding(8.dp)
-    ) {
-        // A simple preview box showing the current color.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .background(Color.Black, shape = RoundedCornerShape(8.dp))
-                .padding(1.dp)
-                .background(Color(red, green, blue, alpha), shape = RoundedCornerShape(8.dp))
-                .padding(top = 8.dp)
-        )
-
-        // Slider for the red component
-        Text(text = "Red: ${"%.2f".format(red)}", color = Color.White)
-        Slider(
-            value = red,
-            onValueChange = { red = it },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(Color.White, shape = CircleShape)
-                ) {}
-            }
-        )
-
-        // Slider for the green component
-        Text(text = "Green: ${"%.2f".format(green)}", color = Color.White)
-        Slider(
-            value = green,
-            onValueChange = { green = it },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(Color.White, shape = CircleShape)
-                ) {}
-            }
-        )
-
-        // Slider for the blue component
-        Text(text = "Blue: ${"%.2f".format(blue)}", color = Color.White)
-        Slider(
-            value = blue,
-            onValueChange = { blue = it },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(Color.White, shape = CircleShape)
-                ) {}
-            }
-        )
-
-        // Slider for the alpha component
-        Text(text = "Alpha: ${"%.2f".format(alpha)}", color = Color.White)
-        Slider(
-            value = alpha,
-            onValueChange = { alpha = it },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(Color.White, shape = CircleShape)
-                ) {}
-            }
-        )
-    }
-}
-
-fun getColorByNodeType(nodeDataType: NodeDataType): Color {
-    return when (nodeDataType) {
-        is NodeDataType.UVNode -> Color.Red
-        is NodeDataType.LengthNode -> Color.Blue
-        is NodeDataType.OutputNode -> Color.Gray
-        is NodeDataType.ColorNode -> Color(0xFF565FA1)
-        is NodeDataType.InputNode -> Color.Gray
-    }
-}
-
 @Composable
 fun ConnectionPoint(
     modifier: Modifier = Modifier,
@@ -463,7 +357,6 @@ fun ConnectionPoint(
             .padding(2.dp)
             .background(color = color, shape = CircleShape)
             .onGloballyPositioned { coordinates ->
-                // Use the parent-relative coordinate instead of the root.
                 val size = coordinates.size.toSize()
                 val anchor =
                     coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
@@ -471,4 +364,3 @@ fun ConnectionPoint(
             }
     )
 }
-

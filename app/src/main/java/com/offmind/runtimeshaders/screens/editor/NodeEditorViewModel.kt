@@ -1,24 +1,15 @@
 package com.offmind.runtimeshaders.screens.editor
 
-import android.content.res.Resources
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import com.offmind.runtimeshaders.screens.editor.dialog.manage_node.AddUINodeItem
-import com.offmind.runtimeshaders.screens.editor.model.Connection
-import com.offmind.runtimeshaders.screens.editor.model.Node
-import com.offmind.runtimeshaders.screens.editor.model.NodeConnection
-import com.offmind.runtimeshaders.screens.editor.model.NodeData
-import com.offmind.runtimeshaders.screens.editor.model.NodeDataType
-import com.offmind.runtimeshaders.screens.editor.model.NodeType
-import com.offmind.runtimeshaders.screens.editor.model.NodeUiData
-import com.offmind.runtimeshaders.screens.editor.model.Pin
-import com.offmind.runtimeshaders.screens.editor.model.PinType
-import com.offmind.runtimeshaders.screens.editor.model.toNodeType
+import com.offmind.runtimeshaders.screens.editor.mock.connections
+import com.offmind.runtimeshaders.screens.editor.mock.nodes
+import com.offmind.runtimeshaders.screens.editor.model.*
 import com.offmind.runtimeshaders.screens.editor.usecase.NodesToCodeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,173 +26,44 @@ class NodeEditorViewModel(
         const val OUTPUT_NODE_ID = -1
     }
 
-    private val nodes = mutableStateListOf(
-        Node(
-            id = 0,
-            name = "Color",
-            type = NodeType.COLOR,
-            position = Offset(10f, 50f),
-            pins = listOf(
-                Pin(
-                    id = 0,
-                    parentId = 0,
-                    type = PinType.FloatRangeType(min = 0f, max = 1f),
-                    canOutput = true,
-                    canInput = true,
-                    name = "R"
-                ),
-                Pin(
-                    id = 1,
-                    parentId = 0,
-                    type = PinType.FloatRangeType(min = 0f, max = 1f),
-                    canOutput = true,
-                    canInput = true,
-                    name = "G"
-                ),
-                Pin(
-                    id = 2,
-                    parentId = 0,
-                    type = PinType.FloatRangeType(min = 0f, max = 1f),
-                    canOutput = true,
-                    canInput = true,
-                    name = "B"
-                ),
-                Pin(
-                    id = 3,
-                    parentId = 0,
-                    type = PinType.FloatRangeType(min = 0f, max = 1f),
-                    canOutput = true,
-                    canInput = true,
-                    name = "A"
-                ),
-            ),
-            uiData = NodeUiData(Offset(10f, 50f))
-        ),
-        Node(
-            id = 1,
-            name = "Vec4",
-            type = NodeType.VEC4,
-            position = Offset(10f, 50f),
-            pins = listOf(
-                Pin(
-                    id = 0,
-                    parentId = 1,
-                    type = PinType.FloatType,
-                    canOutput = true,
-                    canInput = true,
-                    name = "X"
-                ),
-                Pin(
-                    id = 1,
-                    parentId = 1,
-                    type = PinType.FloatType,
-                    canOutput = true,
-                    canInput = true,
-                    name = "Y"
-                ),
-                Pin(
-                    id = 2,
-                    parentId = 1,
-                    type = PinType.FloatType,
-                    canOutput = true,
-                    canInput = true,
-                    name = "Z"
-                ),
-                Pin(
-                    id = 3,
-                    parentId = 1,
-                    type = PinType.FloatType,
-                    canOutput = true,
-                    canInput = true,
-                    name = "W"
-                ),
-                Pin(
-                    id = 4,
-                    parentId = 1,
-                    type = PinType.FloatType,
-                    canOutput = true,
-                    canInput = false,
-                    name = "Vec4"
-                )
-            ),
-            uiData = NodeUiData(Offset(10f, 50f))
-        ),
-        Node(
-            id = 2,
-            name = "Output",
-            type = NodeType.OUTPUT,
-            position = Offset(10f, 50f),
-            pins = listOf(
-                Pin(
-                    id = 0,
-                    parentId = 2,
-                    type = PinType.Vec4Type,
-                    canOutput = false,
-                    canInput = true,
-                    name = "Output"
-                )
-            ),
-            uiData = NodeUiData(Offset(10f, 50f)),
-        ),
-    )
-
-    private val connections = mutableStateListOf(
-        NodeConnection(
-            fromNode = 0,
-            toNode = OUTPUT_NODE_ID,
-        )
-    )
-
     init {
         _state.update {
-            it.copy(nodes2 = nodes)
+            it.copy(nodes2 = nodes, connections2 = connections)
         }
+
+        // Run test to verify NodesToCodeUseCase changes
+        com.offmind.runtimeshaders.screens.editor.usecase.TestNodesToCodeUseCase.runTest()
+
+        // Update shader after test
+        updateShader()
     }
 
     fun onNodePositionChange(nodeId: Int, newPosition: Offset) {
         _state.update { state ->
-            val updatedNodes = state.nodes.map { node ->
+            val updatedNodes2 = state.nodes2.map { node ->
                 if (node.id == nodeId) {
-                    node.copy(position = newPosition)
+                    node.copy(uiData = NodeUiData(position = newPosition))
                 } else {
                     node
                 }
             }.toMutableStateList()
-            state.copy(nodes = updatedNodes)
-        }
-    }
-
-    fun onNodeColorChange(nodeId: Int, newColor: Color) {
-        _state.update { state ->
-            val updatedNodes = state.nodes.map { node ->
-                if (node.id == nodeId) {
-                    node.copy(
-                        nodeDataType = (node.nodeDataType as NodeDataType.ColorNode).copy(
-                            color = newColor
-                        )
-                    )
-                } else {
-                    node
-                }
-            }.toMutableStateList()
-            state.copy(nodes = updatedNodes)
+            state.copy(nodes2 = updatedNodes2)
         }
     }
 
     fun addNode(addUiNodeItem: AddUINodeItem) {
         _state.update { state ->
-            val density = Resources.getSystem().displayMetrics.density
-            val offsetXInDp = state.cameraState.offset.x * density
-            val offsetYInDp = state.cameraState.offset.y * density
+            val offsetXInDp = state.cameraState.offset.x / state.cameraState.zoom
+            val offsetYInDp = state.cameraState.offset.y / state.cameraState.zoom
 
             val pos = Offset(
                 x = state.cameraState.canvasSize.width * 0.25f - offsetXInDp,
-                y = 10f*density + offsetYInDp,
+                y = 50f * state.cameraState.zoom - offsetYInDp,
             )
+
             val newNode2 = Node(
                 id = state.nodes.size,
                 name = "${addUiNodeItem.title} ${state.nodes.size}",
-                position = pos,
                 type = addUiNodeItem.nodeData.toNodeType(),
                 pins = emptyList(),
                 uiData = NodeUiData(pos)
@@ -241,7 +103,44 @@ class NodeEditorViewModel(
     }
 
     fun onCanvasCameraStateChanged(cameraState: CameraState) {
-        _state.update { state -> state.copy(cameraState = cameraState) }
+        val oldState = _state.value.cameraState
+        _state.update { state ->
+            state.copy(
+                cameraState = oldState.copy(
+                    offset = cameraState.offset,
+                    zoom = cameraState.zoom
+                )
+            )
+        }
+    }
+
+    fun updateShader() {
+        _state.update { state ->
+            state.copy(
+                shaderCode = nodesToCodeUseCase.invoke(state.nodes2, state.connections2)
+            )
+        }
+    }
+
+    fun onPinUpdated(pin: Pin) {
+        _state.update { state ->
+            val updatedNodes2 = state.nodes2.map { node ->
+                if (node.id == pin.parentId) {
+                    val updatedPins = node.pins.map { existingPin ->
+                        if (existingPin.id == pin.id) {
+                            pin
+                        } else {
+                            existingPin
+                        }
+                    }
+                    node.copy(pins = updatedPins)
+                } else {
+                    node
+                }
+            }.toMutableStateList()
+            state.copy(nodes2 = updatedNodes2)
+        }
+        updateShader()
     }
 
 }
@@ -258,4 +157,5 @@ data class NodeEditorState(
     val cameraState: CameraState = CameraState(),
     val connections2: List<Connection> = emptyList(),
     val nodes2: SnapshotStateList<Node> = mutableStateListOf(),
+    val shaderCode: String = "",
 )

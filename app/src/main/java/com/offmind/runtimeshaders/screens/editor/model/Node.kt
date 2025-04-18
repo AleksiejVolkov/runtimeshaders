@@ -6,7 +6,6 @@ data class Node(
     val id: Int,
     val name: String,
     val type: NodeType,
-    val position: Offset,
     val pins: List<Pin>,
     val uiData: NodeUiData,
 )
@@ -22,11 +21,26 @@ data class Pin(
     val canOutput: Boolean,
     val canInput: Boolean,
     val name: String,
+    val value: PinValue? = null,
 )
 
+sealed class PinValue {
+    data class FloatValue(val value: Float) : PinValue()
+    data class Vec2Value(val x: Float, val y: Float) : PinValue()
+    data class Vec3Value(val x: Float, val y: Float, val z: Float) : PinValue()
+    data class Vec4Value(val x: Float, val y: Float, val z: Float, val w: Float) : PinValue()
+    data class IntValue(val value: Int) : PinValue()
+    data class BoolValue(val value: Boolean) : PinValue()
+    data class StringValue(val value: String) : PinValue()
+    data class FloatRangeValue(val value: Float) : PinValue()
+}
+
 data class Connection(
-    val connection: Map<String, String>
-)
+    val fromPin: PinConnectionItem,
+    val toPin: PinConnectionItem
+) {
+    data class PinConnectionItem(val parentId: Int, val pinId: Int)
+}
 
 sealed class PinType {
     data object FloatType : PinType()
