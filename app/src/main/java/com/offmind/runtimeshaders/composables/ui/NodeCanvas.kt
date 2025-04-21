@@ -263,7 +263,7 @@ fun NodePinItem(
         when (val data = pin.type) {
             is PinType.FloatRangeType -> {
                 Column(modifier = Modifier.weight(1f)) {
-                    if(pin.value != null) {
+                    if (pin.value != null) {
                         var pinValue by remember { mutableFloatStateOf((pin.value as PinValue.FloatRangeValue).value) }
                         Text(text = "${pin.name}: ${"%.2f".format(pinValue)}", color = Color.White)
                         Slider(
@@ -359,7 +359,7 @@ fun ConnectionPoint(
             .onGloballyPositioned { coordinates ->
                 val size = coordinates.size.toSize()
                 val anchor =
-                    coordinates.positionInParent() + Offset(size.width / 2, size.height / 2)
+                    coordinates.positionInRoot() + Offset(size.width / 2, size.height / 2)
                 onPositionCaptured(anchor)
             }
     )

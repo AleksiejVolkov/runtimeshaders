@@ -31,8 +31,8 @@ fun DrawPinConnectionLines(
             val toPinPosition = inputPinPositions[connection.toPin]
 
             if (fromPinPosition != null && toPinPosition != null) {
-                val startPoint = fromPinPosition + nodes.find { it.id == connection.fromPin.parentId }!!.uiData.position + canvasOffset
-                val endPoint = toPinPosition + nodes.find { it.id == connection.toPin.parentId }!!.uiData.position + canvasOffset
+                val startPoint = fromPinPosition - nodes.find { it.id == connection.fromPin.parentId }!!.uiData.position
+                val endPoint = toPinPosition - nodes.find { it.id == connection.toPin.parentId }!!.uiData.position
 
                 val controlPoint1 = Offset(startPoint.x + controlOffset, startPoint.y)
                 val controlPoint2 = Offset(endPoint.x - controlOffset, endPoint.y)
