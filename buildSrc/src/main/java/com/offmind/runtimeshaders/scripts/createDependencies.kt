@@ -79,7 +79,7 @@ fun createDependenciesScript(task: Task) {
         """.trimIndent()
 
     val outputDir =
-        File("${task.project.buildDir}/generated/src/main/java/com/offmind/runtimeshaders/generated")
+        File("${task.project.layout.buildDirectory.asFile.get()}/generated/src/main/java/com/offmind/runtimeshaders/generated")
     outputDir.mkdirs()
     val outputFile = File(outputDir, "ShaderDependencyMap.kt")
     outputFile.writeText(kotlinCode)

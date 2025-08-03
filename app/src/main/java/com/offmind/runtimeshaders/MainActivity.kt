@@ -48,6 +48,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.CircleTimer> {
                             TimerShaderScreen(paddingValues = paddingValues)
                         }
+                        composable<Route.CanvasDeform> {
+                            CanvasDeformScreen(paddingValues = paddingValues)
+                        }
                     }
                 }
             }
@@ -92,6 +95,14 @@ val effects = listOf(
         title = "Circular Timer",
         description = "Shader for tests",
         screenRoute = Route.CircleTimer(
+            "Test Shader",
+            "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Canvas deform",
+        description = "Canvas deform on drag",
+        screenRoute = Route.CanvasDeform(
             "Test Shader",
             "Shader for tests"
         )

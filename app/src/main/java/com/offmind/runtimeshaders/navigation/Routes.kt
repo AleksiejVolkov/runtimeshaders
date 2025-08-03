@@ -20,4 +20,7 @@ sealed class Route {
 
     @Serializable
     data class SnowedDialog(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class CanvasDeform(val title: String, val description: String) : Route()
 }
