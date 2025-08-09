@@ -111,8 +111,8 @@ val effects = listOf(
         )
     ),
     EffectScreenData(
-        title = "Canvas deform",
-        description = "Canvas deform on drag",
+        title = "Metaballs",
+        description = "Metaballs via uv distortion",
         screenRoute = Route.Metaballs(
             "Test Shader",
             "Shader for tests"

@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -34,17 +35,10 @@ import org.intellij.lang.annotations.Language
 @Composable
 fun MetaballsShaderScreen(paddingValues: PaddingValues) {
     var percentage by remember { mutableFloatStateOf(0.0f) }
-    var expanded by remember { mutableStateOf(false) }
 
     val shader = remember {
         Shader(metaballShader).getRuntimeShader()
     }
-
-    val percentageAnim = animateFloatAsState(
-        targetValue = percentage,
-        animationSpec = tween(800, easing = FastOutLinearInEasing),
-        label = ""
-    )
 
     Box(
         modifier = Modifier
@@ -53,11 +47,9 @@ fun MetaballsShaderScreen(paddingValues: PaddingValues) {
             .background(Color(0xFF171717)),
         contentAlignment = Alignment.Center
     ) {
-
         CircleButton(
             shader = shader,
         )
-
     }
 }
 
@@ -66,7 +58,7 @@ fun MetaballsShaderScreen(paddingValues: PaddingValues) {
 @Composable
 fun CircleButton(
     shader: RuntimeShader,
-    ) {
+) {
     var expanded by remember { mutableStateOf(false) }
 
     val centerX1 = remember { mutableFloatStateOf(-1f) }
@@ -90,13 +82,14 @@ fun CircleButton(
     }
 
     var spec = remember { mutableStateOf(expandAnimSpec) }
-    var pd by remember {mutableStateOf(150.dp)}
-    val pdAnimValue = animateDpAsState(targetValue = pd,
-        animationSpec = spec.value)
+    var pd by remember { mutableStateOf(0.dp) }
+    val pdAnimValue = animateDpAsState(
+        targetValue = pd,
+        animationSpec = spec.value
+    )
 
     val expandPercentage by remember(pdAnimValue.value) {
         mutableFloatStateOf(pdAnimValue.value.value / 250f)
-       // mutableFloatStateOf(0f)
     }
 
     Box(
@@ -116,7 +109,8 @@ fun CircleButton(
             expandPercentage = expandPercentage,
             expandedIcon = Icons.Default.Share,
             collapsedIcon = Icons.Default.Share,
-            onMyCenterReady = { centerX1.floatValue = it}
+            shape = RoundedCornerShape(3.dp),
+            onMyCenterReady = { centerX1.floatValue = it }
         ) {
 
         }
@@ -129,6 +123,7 @@ fun CircleButton(
             expandPercentage = expandPercentage,
             expandedIcon = Icons.Default.Favorite,
             collapsedIcon = Icons.Default.Favorite,
+            shape = CircleShape,
             onMyCenterReady = {
                 centerX3.floatValue = it
             },
@@ -144,10 +139,11 @@ fun CircleButton(
             expandPercentage = expandPercentage,
             expandedIcon = Icons.Default.Email,
             collapsedIcon = Icons.Default.MoreVert,
+            shape = RoundedCornerShape(15.dp),
             onMyCenterReady = { centerX2.floatValue = it }
         ) {
             expanded = !expanded
-            spec.value = if(expanded) expandAnimSpec else collapseAnimSpec
+            spec.value = if (expanded) expandAnimSpec else collapseAnimSpec
             pd = if (expanded) {
                 250.dp
             } else {
@@ -156,8 +152,8 @@ fun CircleButton(
         }
     }
 
-    BackHandler {
-        if (expanded) {
+    if (expanded) {
+        BackHandler {
             spec.value = collapseAnimSpec
             pd = 0.dp
             expanded = false
@@ -176,12 +172,13 @@ fun ShadedButton(
     expandedIcon: ImageVector,
     collapsedIcon: ImageVector,
     onMyCenterReady: (Float) -> Unit,
+    shape: Shape,
     onClick: () -> Unit,
 ) {
     val myCenter = remember { mutableFloatStateOf(-1f) }
 
     val currentIcon = remember(expandPercentage) {
-        if(expandPercentage > 0.5) {
+        if (expandPercentage > 0.5) {
             mutableStateOf(expandedIcon)
         } else {
             mutableStateOf(collapsedIcon)
@@ -205,7 +202,7 @@ fun ShadedButton(
                     listOf(
                         centerOther1 to parentSize.height / 2f,
                         centerOther2 to parentSize.height / 2f,
-                        )
+                    )
                 ),
                 "pointColor" to ShaderTypedValue.Vec3Type(
                     value1 = 0f,
@@ -223,7 +220,7 @@ fun ShadedButton(
             Box(
                 modifier = Modifier
                     .size(50.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(shape)
                     .background(color = Color(0xFFF6F6F6))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -257,24 +254,7 @@ private val metaballShader = """
     uniform float3 pointColor;
     uniform float percent;
     
-    
-    // Параметры: две точки a и b в пространстве (vec2 или vec3)
-    float stickyWeight(vec2 a, vec2 b, float d) {
-        // вычисляем расстояние
-        //float d = length(a - b);
-        // добавляем маленькое значение, чтобы избежать деления на ноль
-        d = max(d, 1e-6);
-        // 1 / sqrt(d)
-        return inversesqrt(pow(d,5.));
-     //   return 1.0 / pow(d + 1.0, 0.8);
-     /* float inv2 = 1.0 / (d * d);
-      float eps  = pow(2.0, 1.8 - 2.0);
-      float tail = eps / pow(d, 1.8);
-      return inv2 + tail;*/
-    }
-    
     float getInfluence(float2 uv) {
-        float mass = 0.45;
         float influence = 0.0;
         float r = parentResolution.x/resolution.x;
         for (int i = 0; i < 10; i++) {
@@ -283,8 +263,7 @@ private val metaballShader = """
             float2 controlPoint = positions[i] / parentResolution - 0.5; //0.5
             controlPoint.x = (controlPoint.x-posInParentNormalized)*r;
             float dist = max(1.,length(uv)+length(controlPoint-uv));
-            //float rawScale = (mass)/pow(0.75*dist,1.);
-            float rawScale = stickyWeight(uv,controlPoint, dist);
+            float rawScale = 1./pow(dist,3.);
             influence += smoothstep(0.,1., rawScale);
             
             if(i==count-1) break;
@@ -292,29 +271,19 @@ private val metaballShader = """
         return clamp(influence,0.,1.);
     }
     
-    float remap(float value, float inMin, float inMax, float outMin, float outMax) {
-       return ((value - inMin) / (inMax - inMin)) * (outMax - outMin) + outMin;
-    }
-    
-    
     vec3 getGradient(vec2 uv, vec3 color) {
-       // scale UV to grid
         float freq = 20.0;
         vec2 gv = uv * freq;
         
-        // create horizontal + vertical wave masks
         float w1 = abs(fract(gv.x) - 0.5);
         float w2 = abs(fract(gv.y) - 0.5);
         float mask = smoothstep(0.45, 0.48, min(w1, w2));
         
-        // pulsate mask over time
         float pulse = 0.5 + 0.5 * sin(time * 3.0 + gv.x + gv.y);
         mask *= pulse;
         
-        // base gradient
         vec3 bg = mix(color, color*vec3(0.2), uv.y);
         
-        // glow the lines
         vec3 lineColor = vec3(1.0);
         return mix(bg, lineColor, mask);
     }
@@ -327,12 +296,8 @@ private val metaballShader = """
         float2 sv = fragCoord / parentResolution;
         sv.x += posInParentNormalized;
       
-        float radius = 0.1;
-        float mass = .5;
-        
-        float influence = getInfluence(uv); // из массива позиций
+        float influence = getInfluence(uv);
         uv *= (1.0 - influence); 
-       
         
         vec4 image = GetImageTexture(uv, vec2(0.5), resolution);
         
