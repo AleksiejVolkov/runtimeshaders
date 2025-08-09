@@ -51,6 +51,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.CanvasDeform> {
                             CanvasDeformScreen(paddingValues = paddingValues)
                         }
+                        composable<Route.Metaballs> {
+                            MetaballsShaderScreen(paddingValues = paddingValues)
+                        }
                     }
                 }
             }
@@ -103,6 +106,14 @@ val effects = listOf(
         title = "Canvas deform",
         description = "Canvas deform on drag",
         screenRoute = Route.CanvasDeform(
+            "Test Shader",
+            "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Canvas deform",
+        description = "Canvas deform on drag",
+        screenRoute = Route.Metaballs(
             "Test Shader",
             "Shader for tests"
         )

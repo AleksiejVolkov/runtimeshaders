@@ -2,6 +2,7 @@ package com.offmind.runtimeshaders.composables
 
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
+import android.graphics.Shader
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import com.offmind.runtimeshaders.shaders.ShaderTypedValue
 import kotlinx.coroutines.delay
+import kotlin.collections.toFloatArray
 
 @Composable
 fun provideTimeAsState(initialValue: Float = 0f): State<Float> {
@@ -92,6 +94,29 @@ private fun applyShaderProperties(
                     value.value4
                 )
             }
+
+            is ShaderTypedValue.IntType -> {
+                shader.setIntUniform(name, value.value)
+            }
+
+            is ShaderTypedValue.Vec2Array -> {
+                shader.setVec2ArrayUniform(name, value.values)
+            }
         }
     }
+}
+
+fun RuntimeShader.setVec2ArrayUniform(
+    name: String,
+    values: List<Pair<Float, Float>>,
+    maxSize: Int = 10
+) {
+    require(values.size <= maxSize) {
+        "Too many elements for uniform '$name'. Maximum allowed is $maxSize, but got ${values.size}"
+    }
+
+    val padded = values + List(maxSize - values.size) { 0f to 0f }
+    val floatArray = padded.flatMap { listOf(it.first, it.second) }.toFloatArray()
+
+    this.setFloatUniform(name, floatArray)
 }

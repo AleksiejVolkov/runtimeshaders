@@ -78,6 +78,7 @@ data class Uniform(
         MAT3("mat3"),
         MAT4("mat4"),
         SHADER("shader"),
+        INT("int")
     }
 }
 
@@ -115,6 +116,8 @@ sealed class ShaderTypedValue() {
     data class Vec2Type(val value1: Float, val value2: Float): ShaderTypedValue()
     data class Vec3Type(val value1: Float, val value2: Float, val value3: Float): ShaderTypedValue()
     data class Vec4Type(val value1: Float, val value2: Float, val value3: Float, val value4: Float): ShaderTypedValue()
+    data class IntType(val value: Int): ShaderTypedValue()
+    data class Vec2Array(val values: List<Pair<Float, Float>>): ShaderTypedValue()
 }
 
 

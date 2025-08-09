@@ -55,7 +55,7 @@ val GetViewTextureFunction = """
 val NormalizeCoordinatesFunction = """
     vec2 NormalizeCoordinates(vec2 o, vec2 r) {
         float2 uv = o / r - 0.5;
-        if (r.x > r.y) {
+        if (r.x >= r.y) {
             uv.x *= r.x / r.y;
         } else {
             uv.y *= r.y / r.x;
