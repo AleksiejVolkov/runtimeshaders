@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.offmind.runtimeshaders.composables.ShadedBox
 import com.offmind.runtimeshaders.shaders.Shader
 import com.offmind.runtimeshaders.shaders.ShaderTypedValue
+import kotlinx.coroutines.delay
 import org.intellij.lang.annotations.Language
 
 @Composable
@@ -66,6 +67,12 @@ fun CircleButton(
     val centerX3 = remember { mutableFloatStateOf(-1f) }
     val parentSize = remember { mutableStateOf(IntSize.Zero) }
 
+    var boundsPercentValue by remember { mutableFloatStateOf(0f) }
+    val boundsPercent by animateFloatAsState(
+        targetValue = boundsPercentValue,
+        animationSpec = tween(durationMillis = 1500),
+    )
+
     val expandAnimSpec = keyframesWithSpline {
         durationMillis = 600
         0.dp at 0
@@ -92,6 +99,12 @@ fun CircleButton(
         mutableFloatStateOf(pdAnimValue.value.value / 250f)
     }
 
+    LaunchedEffect(expandPercentage) {
+        if(expandPercentage == 0f) {
+            boundsPercentValue = 0f
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -109,7 +122,8 @@ fun CircleButton(
             expandPercentage = expandPercentage,
             expandedIcon = Icons.Default.Share,
             collapsedIcon = Icons.Default.Share,
-            shape = RoundedCornerShape(3.dp),
+            shape = CircleShape,
+            boundsPercent = 1f,
             onMyCenterReady = { centerX1.floatValue = it }
         ) {
 
@@ -124,6 +138,7 @@ fun CircleButton(
             expandedIcon = Icons.Default.Favorite,
             collapsedIcon = Icons.Default.Favorite,
             shape = CircleShape,
+            boundsPercent = boundsPercent,
             onMyCenterReady = {
                 centerX3.floatValue = it
             },
@@ -139,12 +154,16 @@ fun CircleButton(
             expandPercentage = expandPercentage,
             expandedIcon = Icons.Default.Email,
             collapsedIcon = Icons.Default.MoreVert,
-            shape = RoundedCornerShape(15.dp),
+            shape = CircleShape,
+            boundsPercent = 1f,
             onMyCenterReady = { centerX2.floatValue = it }
         ) {
             expanded = !expanded
             spec.value = if (expanded) expandAnimSpec else collapseAnimSpec
-            pd = if (expanded) {
+            if (expanded) {
+                boundsPercentValue = 1f
+            }
+             pd = if (expanded) {
                 250.dp
             } else {
                 0.dp
@@ -173,6 +192,7 @@ fun ShadedButton(
     collapsedIcon: ImageVector,
     onMyCenterReady: (Float) -> Unit,
     shape: Shape,
+    boundsPercent: Float,
     onClick: () -> Unit,
 ) {
     val myCenter = remember { mutableFloatStateOf(-1f) }
@@ -214,6 +234,7 @@ fun ShadedButton(
                     value2 = parentSize.height / 2f
                 ),
                 "percent" to ShaderTypedValue.FloatType(expandPercentage),
+                "boundsPercent" to ShaderTypedValue.FloatType(boundsPercent)
             ),
             includeTime = true,
         ) {
@@ -238,7 +259,7 @@ fun ShadedButton(
             Icon(
                 imageVector = currentIcon.value,
                 contentDescription = "Expand Menu",
-                tint = Color.Black
+                tint = if (expandPercentage > 0.5f) Color.White else Color.Black
             )
         }
     }
@@ -252,42 +273,51 @@ private val metaballShader = """
     uniform float2 parentResolution;
     uniform float2 positionInParent;
     uniform float3 pointColor;
-    uniform float percent;
+    uniform float percent; 
+    uniform float boundsPercent;
     
-    float getInfluence(float2 uv) {
+     float getRawInfluence(vec2 uv, vec2 position, float mass) {
+        float dist = max(1.,length(uv)+length(position-uv));
+        float rawScale = mass/pow(dist,3.);
+        return smoothstep(0.,.5, rawScale);
+    }
+    
+    float getCircle(vec2 uv, vec2 position, float r) {
+        return step(length(uv-position),r);
+    }
+    
+    float getInfluence(vec2 uv, vec2 position, float r) {
+        float posInParentNormalized = (positionInParent/parentResolution).x - 0.5;
+        float2 controlPoint = position / parentResolution - 0.5; //0.5
+        controlPoint.x = (controlPoint.x-posInParentNormalized)*r;
+        float dist = max(1.,length(uv)+length(controlPoint-uv));
+        float rawScale = 1./pow(dist,2.);
+        return smoothstep(0.,2., rawScale);
+    }
+    
+    float getInfluenceForUniforms(float2 uv, float r) {
         float influence = 0.0;
-        float r = parentResolution.x/resolution.x;
         for (int i = 0; i < 10; i++) {
-            
-            float posInParentNormalized = (positionInParent/parentResolution).x - 0.5;
-            float2 controlPoint = positions[i] / parentResolution - 0.5; //0.5
-            controlPoint.x = (controlPoint.x-posInParentNormalized)*r;
-            float dist = max(1.,length(uv)+length(controlPoint-uv));
-            float rawScale = 1./pow(dist,3.);
-            influence += smoothstep(0.,1., rawScale);
-            
-            if(i==count-1) break;
+           influence +=  getInfluence(uv, positions[i], r);
+           if(i==count-1) break;
         }
         return clamp(influence,0.,1.);
     }
-    
-    vec3 getGradient(vec2 uv, vec3 color) {
-        float freq = 20.0;
-        vec2 gv = uv * freq;
-        
-        float w1 = abs(fract(gv.x) - 0.5);
-        float w2 = abs(fract(gv.y) - 0.5);
-        float mask = smoothstep(0.45, 0.48, min(w1, w2));
-        
-        float pulse = 0.5 + 0.5 * sin(time * 3.0 + gv.x + gv.y);
-        mask *= pulse;
-        
-        vec3 bg = mix(color, color*vec3(0.2), uv.y);
-        
-        vec3 lineColor = vec3(1.0);
-        return mix(bg, lineColor, mask);
+   
+    vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
+        return a + b * cos(6.28318 * (c * t + d)); // 2π
     }
     
+    vec3 getGradient(vec2 uv) {
+        vec3 col = cosinePalette(uv.x,
+        vec3(0.5),            // базовый уровень
+        vec3(0.5),            // амплитуда
+        vec3(1.0, 1.0, 1.0),  // частоты каналов (можно 1., 1., 1.)
+        vec3(0.00, 0.33, 0.67) // фазовые сдвиги под 3 «тона»
+        );
+        return col;
+    }
+   
     vec4 main(float2 fragCoord) {
         float2 uv = NormalizeCoordinates(fragCoord, resolution);
         float r = parentResolution.x/resolution.x;
@@ -295,16 +325,60 @@ private val metaballShader = """
         float posInParentNormalized = (positionInParent/parentResolution).x - 0.5;
         float2 sv = fragCoord / parentResolution;
         sv.x += posInParentNormalized;
-      
-        float influence = getInfluence(uv);
-        uv *= (1.0 - influence); 
+    //    sv *= vec2(3.,1.);
+     
+        float influence = getInfluenceForUniforms(uv, r);
         
+        float vertPos = sin(1.6*boundsPercent)*-1.;
+        vertPos *= 3.;
+        float horizPos = 0.6*cos(5.*boundsPercent);
+        float radius = 0.1/abs(vertPos-0.3) * (1.-boundsPercent)*percent;
+        vec2 circlePos = vec2(horizPos,vertPos-0.3);
+        
+        float circle = getCircle(uv, circlePos, radius);
+        float inf = getRawInfluence(uv, circlePos, 0.3) * (1.-boundsPercent)*percent;
+        influence += inf;
+        influence += circle;
+        influence = clamp(influence,0.,1.2);
+        
+        float vertPos2 = sin(1.4*boundsPercent)*-.8;
+        vertPos2 *= 1.8;
+        float horizPos2 = 0.4*cos(3.*boundsPercent);
+        float radius2 = 0.2/abs(vertPos2-0.3) * (1.-boundsPercent)*percent;
+        vec2 circlePos2 = vec2(horizPos2,vertPos2-0.3);
+        
+        float circle2 = getCircle(uv, circlePos2, radius2);
+        float inf2 = getRawInfluence(uv, circlePos2, 0.3) * (1.-boundsPercent)*percent;
+        influence += inf2;
+        influence += circle2;
+        influence = clamp(influence,0.,1.2);
+        
+        float vertPos3 = sin(1.4*boundsPercent)*-.8;
+        vertPos3 *= 1.;
+        float horizPos3 = 0.2*cos(9.*boundsPercent);
+        float radius3 = 0.5/abs(vertPos3-0.5) * (1.-boundsPercent)*percent;
+        vec2 circlePos3 = vec2(horizPos3,vertPos3-0.5);
+        
+        float circle3 = getCircle(uv, circlePos3, radius3);
+        float inf3 = getRawInfluence(uv, circlePos3, 0.3) * (1.-boundsPercent)*percent;
+        influence += inf3;
+        influence += circle3;
+        influence = clamp(influence,0.,1.2);
+        
+        uv *= (1.0 - influence); 
+          
         vec4 image = GetImageTexture(uv, vec2(0.5), resolution);
         
-        vec3 col = getGradient(sv,image.rgb);    
+        vec3 col = getGradient(sv);    
         
-        vec3 finalCol = mix(image.rgb,col,0.);
-        return vec4(image);
+        //col = step(0.6,FBM(sv+time,6)) * vec3(1.0);
+        vec3 finalCol = mix(image.rgb,col,percent);
+        float alpha = mix(image.a, circle, circle);
+        alpha = mix(alpha, circle2, circle2);
+        alpha = mix(alpha, circle3, circle3);
+        
+        
+        return vec4(finalCol.rgb*alpha, alpha);
      }
 """.trimIndent()
 
