@@ -26,4 +26,5 @@ sealed class Route {
 
     @Serializable
     data class Metaballs(val title: String, val description: String) : Route()
+
 }

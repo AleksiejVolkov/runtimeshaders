@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
                         composable<Route.Metaballs> {
                             MetaballsShaderScreen(paddingValues = paddingValues)
                         }
+
                     }
                 }
             }
