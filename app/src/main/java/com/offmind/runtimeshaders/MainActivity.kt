@@ -28,7 +28,6 @@ class MainActivity : ComponentActivity() {
                     NavHost(navController, startDestination = Route.EffectsList) {
                         composable<Route.EffectsList> {
                             AllEffectsListScreen(
-                                paddingValues = paddingValues,
                                 effects = effects,
                                 navController = navController
                             )
