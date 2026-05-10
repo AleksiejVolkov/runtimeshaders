@@ -54,7 +54,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.Metaballs> {
                             MetaballsShaderScreen(paddingValues = paddingValues)
                         }
-
+                        composable<Route.ColorfulToggle> {
+                            ColorfulToggleScreen(paddingValues = paddingValues)
+                        }
                     }
                 }
             }
@@ -117,6 +119,14 @@ val effects = listOf(
         screenRoute = Route.Metaballs(
             "Test Shader",
             "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Colorful Toggle",
+        description = "",
+        screenRoute = Route.ColorfulToggle(
+            "Colorful Toggle",
+            ""
         )
     )
 )

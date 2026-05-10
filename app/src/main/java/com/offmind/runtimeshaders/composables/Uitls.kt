@@ -10,7 +10,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import com.offmind.runtimeshaders.shaders.ShaderTypedValue
@@ -37,33 +40,46 @@ fun ShadedBox(
     shader: RuntimeShader,
     shaderUniforms: Map<String, ShaderTypedValue> = emptyMap(),
     includeTime: Boolean = false,
-    content: @Composable () -> Unit = {}
+    content: (@Composable () -> Unit)? = null
 ) {
     val timeState = provideTimeAsState()
-    if (includeTime) {
-        shader.setFloatUniform("time", timeState.value)
-        LaunchedEffect(timeState) {
-            shader.setFloatUniform("time", timeState.value)
-        }
+    val paint = remember { Paint() }
+
+    val shaderModifier = if (content == null) {
+        modifier
+            .onSizeChanged { size ->
+                shader.setFloatUniform("resolution", size.width.toFloat(), size.height.toFloat())
+            }
+            .drawBehind {
+                applyShaderProperties(shader, shaderUniforms)
+                if (includeTime) shader.setFloatUniform("time", timeState.value)
+                paint.asFrameworkPaint().shader = shader
+                drawIntoCanvas { canvas ->
+                    canvas.drawRect(
+                        androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height),
+                        paint
+                    )
+                }
+            }
+    } else {
+        modifier
+            .onSizeChanged { size ->
+                shader.setFloatUniform("resolution", size.width.toFloat(), size.height.toFloat())
+            }
+            .graphicsLayer {
+                applyShaderProperties(shader, shaderUniforms)
+                if (includeTime) shader.setFloatUniform("time", timeState.value)
+                this.renderEffect = RenderEffect
+                    .createRuntimeShaderEffect(shader, "image")
+                    .asComposeRenderEffect()
+            }
     }
 
-    Box(modifier = modifier
-        .onSizeChanged { size ->
-            shader.setFloatUniform(
-                "resolution",
-                size.width.toFloat(),
-                size.height.toFloat()
-            )
-        }
-        .graphicsLayer {
-            applyShaderProperties(shader, shaderUniforms)
-            shader.setFloatUniform("time", timeState.value)
-            this.renderEffect = RenderEffect
-                .createRuntimeShaderEffect(shader, "image")
-                .asComposeRenderEffect()
-        },
-        contentAlignment = androidx.compose.ui.Alignment.Center) {
-        content()
+    Box(
+        modifier = shaderModifier,
+        contentAlignment = androidx.compose.ui.Alignment.Center
+    ) {
+        content?.invoke()
     }
 }
 
