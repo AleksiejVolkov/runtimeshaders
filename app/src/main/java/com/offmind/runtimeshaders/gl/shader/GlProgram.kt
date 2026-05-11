@@ -22,6 +22,14 @@ class GlProgram(
         GLES20.glUniform1f(getUniform(name), value)
     }
 
+    fun setInt(name: String, value: Int) {
+        GLES20.glUniform1i(getUniform(name), value)
+    }
+
+    fun setVec2(name: String, value1: Float, value2: Float) {
+        GLES20.glUniform2f(getUniform(name), value1, value2)
+    }
+
     fun setMat4(name: String, value: FloatArray) {
         GLES20.glUniformMatrix4fv(getUniform(name), 1, false, value, 0)
     }

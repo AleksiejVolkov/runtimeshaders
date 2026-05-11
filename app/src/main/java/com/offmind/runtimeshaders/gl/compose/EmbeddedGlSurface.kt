@@ -4,13 +4,15 @@ import androidx.compose.foundation.AndroidEmbeddedExternalSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import com.offmind.runtimeshaders.gl.BackgroundCapture
 import com.offmind.runtimeshaders.gl.GLRenderer
 import com.offmind.runtimeshaders.gl.scene.GlScene
 
 @Composable
 fun EmbeddedGlSurface(
     scene: GlScene,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backgroundCapture: BackgroundCapture? = null
 ) {
     AndroidEmbeddedExternalSurface(
         modifier = modifier,
@@ -23,7 +25,8 @@ fun EmbeddedGlSurface(
                     surface = surface,
                     initialWidth = width,
                     initialHeight = height,
-                    scene = scene
+                    scene = scene,
+                    backgroundCapture = backgroundCapture
                 ).also { renderer ->
                     renderer.start()
                     renderer.resize(width, height)

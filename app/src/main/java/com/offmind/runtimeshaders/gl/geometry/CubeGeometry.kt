@@ -1,53 +1,84 @@
 package com.offmind.runtimeshaders.gl.geometry
 
 object CubeGeometry {
-    fun createCalmColorCube(): GlMesh = GlMesh(
-        vertices = CUBE_VERTICES,
+    fun createGlassCube(): GlMesh = GlMesh(
+        vertices = createCubeVertices(),
         vertexLayout = VertexLayout()
     )
 
-    private val CUBE_VERTICES = floatArrayOf(
-        // Front, muted coral
-        -1f, -1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        1f, -1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        1f, 1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        -1f, -1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        1f, 1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        -1f, 1f, 1f, 0.74f, 0.42f, 0.38f, 1f,
-        // Back, sage
-        1f, -1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        -1f, -1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        -1f, 1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        1f, -1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        -1f, 1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        1f, 1f, -1f, 0.44f, 0.62f, 0.49f, 1f,
-        // Left, desaturated blue
-        -1f, -1f, -1f, 0.42f, 0.55f, 0.72f, 1f,
-        -1f, -1f, 1f, 0.42f, 0.55f, 0.72f, 1f,
-        -1f, 1f, 1f, 0.42f, 0.55f, 0.72f, 1f,
-        -1f, -1f, -1f, 0.42f, 0.55f, 0.72f, 1f,
-        -1f, 1f, 1f, 0.42f, 0.55f, 0.72f, 1f,
-        -1f, 1f, -1f, 0.42f, 0.55f, 0.72f, 1f,
-        // Right, ochre
-        1f, -1f, 1f, 0.76f, 0.64f, 0.36f, 1f,
-        1f, -1f, -1f, 0.76f, 0.64f, 0.36f, 1f,
-        1f, 1f, -1f, 0.76f, 0.64f, 0.36f, 1f,
-        1f, -1f, 1f, 0.76f, 0.64f, 0.36f, 1f,
-        1f, 1f, -1f, 0.76f, 0.64f, 0.36f, 1f,
-        1f, 1f, 1f, 0.76f, 0.64f, 0.36f, 1f,
-        // Top, dusty lavender
-        -1f, 1f, 1f, 0.61f, 0.50f, 0.72f, 1f,
-        1f, 1f, 1f, 0.61f, 0.50f, 0.72f, 1f,
-        1f, 1f, -1f, 0.61f, 0.50f, 0.72f, 1f,
-        -1f, 1f, 1f, 0.61f, 0.50f, 0.72f, 1f,
-        1f, 1f, -1f, 0.61f, 0.50f, 0.72f, 1f,
-        -1f, 1f, -1f, 0.61f, 0.50f, 0.72f, 1f,
-        // Bottom, soft teal
-        -1f, -1f, -1f, 0.36f, 0.65f, 0.66f, 1f,
-        1f, -1f, -1f, 0.36f, 0.65f, 0.66f, 1f,
-        1f, -1f, 1f, 0.36f, 0.65f, 0.66f, 1f,
-        -1f, -1f, -1f, 0.36f, 0.65f, 0.66f, 1f,
-        1f, -1f, 1f, 0.36f, 0.65f, 0.66f, 1f,
-        -1f, -1f, 1f, 0.36f, 0.65f, 0.66f, 1f
-    )
+    private fun createCubeVertices(): FloatArray {
+        val vertices = mutableListOf<Float>()
+
+        fun addFace(normal: FloatArray, color: FloatArray, corners: Array<FloatArray>) {
+            val indices = intArrayOf(0, 1, 2, 0, 2, 3)
+            indices.forEach { index ->
+                vertices += corners[index].toList()
+                vertices += normal.toList()
+                vertices += color.toList()
+            }
+        }
+
+        addFace(
+            normal = floatArrayOf(0f, 0f, 1f),
+            color = floatArrayOf(0.72f, 0.9f, 1f, 1f),
+            corners = arrayOf(
+                floatArrayOf(-1f, -1f, 1f),
+                floatArrayOf(1f, -1f, 1f),
+                floatArrayOf(1f, 1f, 1f),
+                floatArrayOf(-1f, 1f, 1f)
+            )
+        )
+        addFace(
+            normal = floatArrayOf(0f, 0f, -1f),
+            color = floatArrayOf(0.50f, 0.72f, 0.86f, 1f),
+            corners = arrayOf(
+                floatArrayOf(1f, -1f, -1f),
+                floatArrayOf(-1f, -1f, -1f),
+                floatArrayOf(-1f, 1f, -1f),
+                floatArrayOf(1f, 1f, -1f)
+            )
+        )
+        addFace(
+            normal = floatArrayOf(-1f, 0f, 0f),
+            color = floatArrayOf(0.62f, 0.86f, 0.92f, 1f),
+            corners = arrayOf(
+                floatArrayOf(-1f, -1f, -1f),
+                floatArrayOf(-1f, -1f, 1f),
+                floatArrayOf(-1f, 1f, 1f),
+                floatArrayOf(-1f, 1f, -1f)
+            )
+        )
+        addFace(
+            normal = floatArrayOf(1f, 0f, 0f),
+            color = floatArrayOf(0.86f, 0.94f, 1f, 1f),
+            corners = arrayOf(
+                floatArrayOf(1f, -1f, 1f),
+                floatArrayOf(1f, -1f, -1f),
+                floatArrayOf(1f, 1f, -1f),
+                floatArrayOf(1f, 1f, 1f)
+            )
+        )
+        addFace(
+            normal = floatArrayOf(0f, 1f, 0f),
+            color = floatArrayOf(0.78f, 0.88f, 1f, 1f),
+            corners = arrayOf(
+                floatArrayOf(-1f, 1f, 1f),
+                floatArrayOf(1f, 1f, 1f),
+                floatArrayOf(1f, 1f, -1f),
+                floatArrayOf(-1f, 1f, -1f)
+            )
+        )
+        addFace(
+            normal = floatArrayOf(0f, -1f, 0f),
+            color = floatArrayOf(0.45f, 0.68f, 0.82f, 1f),
+            corners = arrayOf(
+                floatArrayOf(-1f, -1f, -1f),
+                floatArrayOf(1f, -1f, -1f),
+                floatArrayOf(1f, -1f, 1f),
+                floatArrayOf(-1f, -1f, 1f)
+            )
+        )
+
+        return vertices.toFloatArray()
+    }
 }

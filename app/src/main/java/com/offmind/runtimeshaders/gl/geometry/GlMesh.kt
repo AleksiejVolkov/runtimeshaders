@@ -37,6 +37,14 @@ class GlMesh(
         )
     }
 
+    fun bindNormal(attributeHandle: Int) {
+        bindAttribute(
+            attributeHandle = attributeHandle,
+            componentCount = vertexLayout.normalComponents,
+            offsetFloats = vertexLayout.normalOffsetFloats
+        )
+    }
+
     fun draw() {
         GLES20.glDrawArrays(drawMode, 0, vertexCount)
     }

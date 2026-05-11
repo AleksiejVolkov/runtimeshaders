@@ -6,6 +6,7 @@ object GlRenderConstants {
     const val EGL_OPENGL_ES_VERSION = 2
 
     const val COLOR_COMPONENTS = 4
+    const val NORMAL_COMPONENTS = 3
     const val POSITION_COMPONENTS = 3
     const val FLOAT_BYTES = Float.SIZE_BYTES
 
