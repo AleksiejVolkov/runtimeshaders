@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class BackgroundCapture(
-    private val window: Window
+    private val window: Window? = null
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val enabled = AtomicBoolean(false)
@@ -65,8 +65,14 @@ class BackgroundCapture(
             return
         }
 
+        val captureWindow = window
+        if (captureWindow == null) {
+            inFlight.set(false)
+            return
+        }
+
         val destination = Bitmap.createBitmap(rect.width(), rect.height(), Bitmap.Config.ARGB_8888)
-        PixelCopy.request(window, rect, destination, { result ->
+        PixelCopy.request(captureWindow, rect, destination, { result ->
             inFlight.set(false)
             if (result == PixelCopy.SUCCESS) {
                 latestBitmap.getAndSet(destination)?.recycle()
