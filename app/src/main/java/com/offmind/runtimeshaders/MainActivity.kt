@@ -56,6 +56,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.ColorfulToggle> {
                             ColorfulToggleScreen(paddingValues = paddingValues)
                         }
+                        composable<Route.ShadedElements> {
+                            ShadedElementsScreen(paddingValues = paddingValues)
+                        }
                     }
                 }
             }
@@ -126,6 +129,14 @@ val effects = listOf(
         screenRoute = Route.ColorfulToggle(
             "Colorful Toggle",
             ""
+        )
+    ),
+    EffectScreenData(
+        title = "Shaded Elements",
+        description = "Add global shadow to all screen UI",
+        screenRoute = Route.ShadedElements (
+            title = "Shaded Elements",
+            description = ""
         )
     )
 )

@@ -29,4 +29,7 @@ sealed class Route {
 
     @Serializable
     data class ColorfulToggle(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class ShadedElements(val title: String, val description: String) : Route()
 }

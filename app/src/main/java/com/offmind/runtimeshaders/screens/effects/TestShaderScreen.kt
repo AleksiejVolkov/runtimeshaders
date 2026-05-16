@@ -35,7 +35,7 @@ fun TestShaderScreen(paddingValues: PaddingValues) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(brush = Brush.verticalGradient(colors = listOf(Color(0xFF07130C), Color(0xFF212224))))
+            .background(brush = Brush.verticalGradient(colors = listOf(Color(0xFFBDBDBD), Color(0xFFE5E5E5))))
     ) {
         Column(
             modifier = Modifier
