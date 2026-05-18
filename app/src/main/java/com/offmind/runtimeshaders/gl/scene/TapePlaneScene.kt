@@ -85,7 +85,6 @@ class TapePlaneScene : GlScene {
 
         activeProgram.use()
         activeProgram.setMat4(UNIFORM_MVP, mvp)
-        activeProgram.setFloat(UNIFORM_SEGMENT_HEIGHT, TAPE_HEIGHT / TAPE_SEGMENTS)
         activeProgram.setFloat(UNIFORM_TAPE_WIDTH, TAPE_WIDTH)
         activeProgram.setFloat(UNIFORM_TAPE_HEIGHT, TAPE_HEIGHT)
 
@@ -175,7 +174,6 @@ class TapePlaneScene : GlScene {
     private companion object {
         private const val TAPE_WIDTH = 0.804704f
         private const val TAPE_HEIGHT = 9.993885f
-        private const val TAPE_SEGMENTS = 16f
         private const val TAPE_THICKNESS = 0.16f
         private const val TAPE_SUBDIVISION_POWER = 2
         private const val DEFAULT_CAMERA_DISTANCE = 3.1f
@@ -219,7 +217,6 @@ class TapePlaneScene : GlScene {
         private const val ATTRIBUTE_NORMAL = "aNormal"
         private const val ATTRIBUTE_COLOR = "aColor"
         private const val UNIFORM_MVP = "uMvp"
-        private const val UNIFORM_SEGMENT_HEIGHT = "uSegmentHeight"
         private const val UNIFORM_TAPE_WIDTH = "uTapeWidth"
         private const val UNIFORM_TAPE_HEIGHT = "uTapeHeight"
 
@@ -242,7 +239,6 @@ class TapePlaneScene : GlScene {
 
         private const val FRAGMENT_SHADER = """
             precision mediump float;
-            uniform float uSegmentHeight;
             uniform float uTapeWidth;
             uniform float uTapeHeight;
             varying vec3 vObjectPosition;
@@ -256,17 +252,14 @@ class TapePlaneScene : GlScene {
                     smoothstep(0.02, 0.0, vObjectPosition.y),
                     smoothstep(uTapeHeight - 0.02, uTapeHeight, vObjectPosition.y)
                 );
-                float segmentDistance = abs(fract(vObjectPosition.y / uSegmentHeight) - 0.5);
-                float segmentLine = smoothstep(0.47, 0.5, segmentDistance);
                 float centerHighlight = 1.0 - smoothstep(0.0, 0.68, centerDistance);
                 float faceLight = 0.82 + abs(vNormal.z) * 0.18;
 
                 vec3 baseColor = mix(vColor.rgb * faceLight, vec3(0.96, 0.99, 1.0), centerHighlight * 0.22);
                 baseColor = mix(baseColor, vec3(0.28, 0.58, 0.78), sideEdge * 0.55);
-                baseColor = mix(baseColor, vec3(1.0), segmentLine * 0.42);
                 baseColor = mix(baseColor, vec3(0.25, 0.48, 0.66), endEdge * 0.7);
 
-                gl_FragColor = vec4(baseColor, 0.92);
+                gl_FragColor = vec4(baseColor, 1.);
             }
         """
     }

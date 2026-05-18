@@ -33,12 +33,27 @@ object PlaneGeometry {
         val halfThickness = thickness * 0.5f
         val subdivisions = 1 shl subdivisionPower
         val geometrySegments = lengthSegments * subdivisions
+        val firstBodySegment = subdivisions
+        val lastBodySegmentExclusive = geometrySegments - subdivisions
+        val capSegments = (DEFAULT_CAP_SEGMENTS * subdivisions).coerceAtLeast(DEFAULT_CAP_SEGMENTS)
         val sections = List(geometrySegments + 1) { index ->
             val amount = index.toFloat() / geometrySegments
             val center = sampleCurve(curvePoints, curveWidths, amount)
             val tangent = sampleTangent(curvePoints, curveWidths, amount)
             val surfaceNormal = normalFromTangent(tangent)
+            val tangentUnit = tangentUnit(tangent)
             TapeSection(
+                center = floatArrayOf(center.x, center.y, center.z),
+                centerFront = offsetPosition(
+                    position = floatArrayOf(center.x, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = halfThickness
+                ),
+                centerBack = offsetPosition(
+                    position = floatArrayOf(center.x, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = -halfThickness
+                ),
                 leftFront = offsetPosition(
                     position = floatArrayOf(center.x - halfWidth, center.y, center.z),
                     normal = surfaceNormal,
@@ -61,11 +76,12 @@ object PlaneGeometry {
                 ),
                 frontNormal = surfaceNormal,
                 backNormal = opposite(surfaceNormal),
+                tangentUnit = tangentUnit,
                 color = colorForSegment(amount)
             )
         }
 
-        for (segment in 0 until geometrySegments) {
+        for (segment in firstBodySegment until lastBodySegmentExclusive) {
             val start = sections[segment]
             val end = sections[segment + 1]
 
@@ -115,15 +131,19 @@ object PlaneGeometry {
             )
         }
 
-        addCap(
+        addRoundCap(
             vertices = vertices,
-            section = sections.first(),
-            normal = START_CAP_NORMAL
+            section = sections[firstBodySegment],
+            halfWidth = halfWidth,
+            capSegments = capSegments,
+            isStart = true
         )
-        addCap(
+        addRoundCap(
             vertices = vertices,
-            section = sections.last(),
-            normal = END_CAP_NORMAL
+            section = sections[lastBodySegmentExclusive],
+            halfWidth = halfWidth,
+            capSegments = capSegments,
+            isStart = false
         )
 
         return GlMesh(
@@ -133,12 +153,16 @@ object PlaneGeometry {
     }
 
     private data class TapeSection(
+        val center: FloatArray,
+        val centerFront: FloatArray,
+        val centerBack: FloatArray,
         val leftFront: FloatArray,
         val rightFront: FloatArray,
         val leftBack: FloatArray,
         val rightBack: FloatArray,
         val frontNormal: FloatArray,
         val backNormal: FloatArray,
+        val tangentUnit: FloatArray,
         val color: FloatArray
     )
 
@@ -162,18 +186,50 @@ object PlaneGeometry {
         addVertex(vertices, topLeft, topNormal, topColor)
     }
 
-    private fun addCap(
+    private fun addRoundCap(
         vertices: MutableList<Float>,
         section: TapeSection,
-        normal: FloatArray
+        halfWidth: Float,
+        capSegments: Int,
+        isStart: Boolean
     ) {
-        addVertex(vertices, section.leftBack, normal, section.color)
-        addVertex(vertices, section.rightBack, normal, section.color)
-        addVertex(vertices, section.rightFront, normal, section.color)
+        val capCenterFront = section.centerFront
+        val capCenterBack = section.centerBack
+        val angles = List(capSegments + 1) { index ->
+            val amount = index.toFloat() / capSegments
+            if (isStart) {
+                PI + PI * amount
+            } else {
+                PI * amount
+            }
+        }
 
-        addVertex(vertices, section.leftBack, normal, section.color)
-        addVertex(vertices, section.rightFront, normal, section.color)
-        addVertex(vertices, section.leftFront, normal, section.color)
+        for (index in 0 until capSegments) {
+            val angle0 = angles[index]
+            val angle1 = angles[index + 1]
+            val front0 = capPoint(capCenterFront, section.tangentUnit, halfWidth, angle0)
+            val front1 = capPoint(capCenterFront, section.tangentUnit, halfWidth, angle1)
+            val back0 = capPoint(capCenterBack, section.tangentUnit, halfWidth, angle0)
+            val back1 = capPoint(capCenterBack, section.tangentUnit, halfWidth, angle1)
+            val sideNormal0 = capSideNormal(section.tangentUnit, angle0)
+            val sideNormal1 = capSideNormal(section.tangentUnit, angle1)
+
+            addVertex(vertices, capCenterFront, section.frontNormal, section.color)
+            addVertex(vertices, front0, section.frontNormal, section.color)
+            addVertex(vertices, front1, section.frontNormal, section.color)
+
+            addVertex(vertices, capCenterBack, section.backNormal, section.color)
+            addVertex(vertices, back1, section.backNormal, section.color)
+            addVertex(vertices, back0, section.backNormal, section.color)
+
+            addVertex(vertices, back0, sideNormal0, section.color)
+            addVertex(vertices, front0, sideNormal0, section.color)
+            addVertex(vertices, front1, sideNormal1, section.color)
+
+            addVertex(vertices, back0, sideNormal0, section.color)
+            addVertex(vertices, front1, sideNormal1, section.color)
+            addVertex(vertices, back1, sideNormal1, section.color)
+        }
     }
 
     private fun addVertex(
@@ -298,6 +354,40 @@ object PlaneGeometry {
         return floatArrayOf(0f, normalY / length, normalZ / length)
     }
 
+    private fun tangentUnit(tangent: CurvePoint): FloatArray {
+        val length = kotlin.math.sqrt(tangent.y * tangent.y + tangent.z * tangent.z)
+        if (length == 0f) return floatArrayOf(0f, 1f, 0f)
+        return floatArrayOf(0f, tangent.y / length, tangent.z / length)
+    }
+
+    private fun capPoint(
+        center: FloatArray,
+        tangentUnit: FloatArray,
+        halfWidth: Float,
+        angle: Float
+    ): FloatArray {
+        val sideOffset = kotlin.math.cos(angle) * halfWidth
+        val tangentOffset = kotlin.math.sin(angle) * halfWidth
+        return floatArrayOf(
+            center[0] + sideOffset,
+            center[1] + tangentUnit[1] * tangentOffset,
+            center[2] + tangentUnit[2] * tangentOffset
+        )
+    }
+
+    private fun capSideNormal(
+        tangentUnit: FloatArray,
+        angle: Float
+    ): FloatArray {
+        val sideNormal = kotlin.math.cos(angle)
+        val tangentNormal = kotlin.math.sin(angle)
+        return floatArrayOf(
+            sideNormal,
+            tangentUnit[1] * tangentNormal,
+            tangentUnit[2] * tangentNormal
+        )
+    }
+
     private fun offsetPosition(
         position: FloatArray,
         normal: FloatArray,
@@ -332,10 +422,10 @@ object PlaneGeometry {
     private const val DEFAULT_THICKNESS = 0.16f
     private const val DEFAULT_LENGTH_SEGMENTS = 16
     private const val DEFAULT_SUBDIVISION_POWER = 2
+    private const val DEFAULT_CAP_SEGMENTS = 8
     private const val DEFAULT_CURVE_WIDTH = 1f
     private const val CURVE_POINT_COUNT = 4
+    private const val PI = kotlin.math.PI.toFloat()
     private val LEFT_SIDE_NORMAL = floatArrayOf(-1f, 0f, 0f)
     private val RIGHT_SIDE_NORMAL = floatArrayOf(1f, 0f, 0f)
-    private val START_CAP_NORMAL = floatArrayOf(0f, -1f, 0f)
-    private val END_CAP_NORMAL = floatArrayOf(0f, 1f, 0f)
 }

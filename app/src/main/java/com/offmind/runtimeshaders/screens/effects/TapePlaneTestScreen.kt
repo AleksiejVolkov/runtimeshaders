@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +48,7 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
     val navigationBarsPadding = WindowInsets.navigationBars.asPaddingValues()
     var cameraControls by remember { mutableStateOf(scene.cameraControls()) }
     var curvePointControls by remember { mutableStateOf(scene.curvePointControls()) }
+    var sliderValue by remember { mutableStateOf(0f) }
 
     fun refreshControls() {
         cameraControls = scene.cameraControls()
@@ -68,12 +71,26 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.generic_background),
+            painter = painterResource(id = R.drawable.generic_mountians),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alpha = 0.32f,
             modifier = Modifier.fillMaxSize()
         )
+        Box(modifier = Modifier.fillMaxSize().padding(top = 100.dp)) {
+            Slider(
+                value = sliderValue,
+                onValueChange = { value ->
+                    sliderValue = (value / SLIDER_STEP).toInt() * SLIDER_STEP
+                },
+                valueRange = 0f..1f,
+                steps = SLIDER_STEPS,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            )
+        }
         EmbeddedGlSurface(
             scene = scene,
             modifier = Modifier.size(width = 340.dp, height = 300.dp).padding(bottom = 100.dp)
@@ -281,3 +298,5 @@ private const val CAMERA_DISTANCE_STEP = 0.35f
 private const val POINT_HEIGHT_STEP = 0.18f
 private const val POINT_Y_STEP = 0.18f
 private const val POINT_WIDTH_STEP = 0.12f
+private const val SLIDER_STEP = 0.05f
+private const val SLIDER_STEPS = 19
