@@ -44,6 +44,9 @@ class MainActivity : ComponentActivity() {
                         composable<Route.TestShader> {
                             TestShaderScreen(paddingValues = paddingValues)
                         }
+                        composable<Route.TapePlaneTest> {
+                            TapePlaneTestScreen(paddingValues = paddingValues)
+                        }
                         composable<Route.CircleTimer> {
                             TimerShaderScreen(paddingValues = paddingValues)
                         }
@@ -94,6 +97,14 @@ val effects = listOf(
         screenRoute = Route.TestShader(
             "Test Shader",
             "Shader for tests"
+        )
+    ),
+    EffectScreenData(
+        title = "Tape plane test",
+        description = "Segmented OpenGL tape plane",
+        screenRoute = Route.TapePlaneTest(
+            "Tape Plane Test",
+            "Segmented OpenGL tape plane"
         )
     ),
     EffectScreenData(
