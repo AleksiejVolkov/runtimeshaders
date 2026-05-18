@@ -10,7 +10,10 @@ import com.offmind.runtimeshaders.gl.shader.GlProgram
 import kotlin.math.cos
 import kotlin.math.sin
 
-class TapePlaneScene : GlScene {
+class TapePlaneScene(
+    private val gradientStartColor: FloatArray = DEFAULT_GRADIENT_START_COLOR,
+    private val gradientEndColor: FloatArray = DEFAULT_GRADIENT_END_COLOR
+) : GlScene {
     data class CameraControls(
         val yawRadians: Float,
         val elevationRadians: Float,
@@ -31,6 +34,7 @@ class TapePlaneScene : GlScene {
     )
 
     private var program: GlProgram? = null
+    private var shadowProgram: GlProgram? = null
     private val curvePoints = ZERO_STATE.curvePoints.toMutableList()
     private val curveWidths = ZERO_STATE.curveWidths.toMutableList()
     private val pointMorphProgress = FloatArray(ZERO_STATE.curvePoints.size)
@@ -58,11 +62,18 @@ class TapePlaneScene : GlScene {
             vertexShaderSource = VERTEX_SHADER,
             fragmentShaderSource = FRAGMENT_SHADER
         )
+        shadowProgram = GlProgram(
+            vertexShaderSource = SHADOW_VERTEX_SHADER,
+            fragmentShaderSource = SHADOW_FRAGMENT_SHADER
+        )
     }
 
     override fun onDrawFrame(frameInfo: GlFrameInfo) {
         val activeProgram = checkNotNull(program) {
             "TapePlaneScene must be initialized before drawing."
+        }
+        val activeShadowProgram = checkNotNull(shadowProgram) {
+            "TapePlaneScene shadow program must be initialized before drawing."
         }
         updateMorph(frameInfo.frameTimeNanos)
 
@@ -94,21 +105,69 @@ class TapePlaneScene : GlScene {
         Matrix.translateM(model, 0, 0f, -TAPE_HEIGHT * 0.5f, 0f)
         Matrix.multiplyMM(mvp, 0, viewProjection, 0, model, 0)
 
+        drawShadow(activeShadowProgram)
+        GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT)
+        drawTape(activeProgram, frameInfo)
+    }
+
+    private fun drawShadow(activeProgram: GlProgram) {
         activeProgram.use()
         activeProgram.setMat4(UNIFORM_MVP, mvp)
-        activeProgram.setFloat(UNIFORM_TAPE_WIDTH, TAPE_WIDTH)
+        activeProgram.setFloat(UNIFORM_SHADOW_GROUND_Z, SHADOW_GROUND_Z)
+        activeProgram.setFloat(UNIFORM_SHADOW_OFFSET_X, SHADOW_OFFSET_X)
+        activeProgram.setFloat(UNIFORM_SHADOW_OFFSET_Y, SHADOW_OFFSET_Y)
+        activeProgram.setFloat(UNIFORM_SHADOW_ALPHA, SHADOW_ALPHA)
+        activeProgram.setFloat(UNIFORM_SHADOW_TAPE_HEIGHT, TAPE_HEIGHT)
+        activeProgram.setFloat(UNIFORM_SHADOW_TAPE_WIDTH, TAPE_WIDTH)
+        activeProgram.setFloat(UNIFORM_SHADOW_BASE_SOFTNESS, SHADOW_BASE_SOFTNESS)
+        activeProgram.setFloat(UNIFORM_SHADOW_HEIGHT_SOFTNESS, SHADOW_HEIGHT_SOFTNESS)
+
+        val positionHandle = activeProgram.getAttribute(ATTRIBUTE_POSITION)
+        mesh.bindPosition(positionHandle)
+        GLES20.glDepthMask(false)
+        mesh.draw()
+        GLES20.glDepthMask(true)
+        GLES20.glDisableVertexAttribArray(positionHandle)
+    }
+
+    private fun drawTape(activeProgram: GlProgram, frameInfo: GlFrameInfo) {
+        activeProgram.use()
+        activeProgram.setMat4(UNIFORM_MVP, mvp)
         activeProgram.setFloat(UNIFORM_TAPE_HEIGHT, TAPE_HEIGHT)
+        activeProgram.setFloat(
+            UNIFORM_HAS_BACKGROUND_TEXTURE,
+            if (frameInfo.isBackgroundTextureReady) 1f else 0f
+        )
+        activeProgram.setVec2(
+            UNIFORM_RESOLUTION,
+            frameInfo.width.toFloat(),
+            frameInfo.height.toFloat()
+        )
+        activeProgram.setInt(UNIFORM_BACKGROUND_TEXTURE, BACKGROUND_TEXTURE_UNIT_INDEX)
+        activeProgram.setVec3(
+            UNIFORM_GRADIENT_START_COLOR,
+            gradientStartColor[0],
+            gradientStartColor[1],
+            gradientStartColor[2]
+        )
+        activeProgram.setVec3(
+            UNIFORM_GRADIENT_END_COLOR,
+            gradientEndColor[0],
+            gradientEndColor[1],
+            gradientEndColor[2]
+        )
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + BACKGROUND_TEXTURE_UNIT_INDEX)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, frameInfo.backgroundTextureId)
 
         val positionHandle = activeProgram.getAttribute(ATTRIBUTE_POSITION)
         val normalHandle = activeProgram.getAttribute(ATTRIBUTE_NORMAL)
-        val colorHandle = activeProgram.getAttribute(ATTRIBUTE_COLOR)
         mesh.bindPosition(positionHandle)
         mesh.bindNormal(normalHandle)
-        mesh.bindColor(colorHandle)
         mesh.draw()
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(normalHandle)
-        GLES20.glDisableVertexAttribArray(colorHandle)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
     }
 
     fun orbit(deltaYawRadians: Float, deltaElevationRadians: Float) {
@@ -171,7 +230,9 @@ class TapePlaneScene : GlScene {
 
     override fun release() {
         program?.release()
+        shadowProgram?.release()
         program = null
+        shadowProgram = null
     }
 
     private fun cameraEyeX(): Float {
@@ -264,6 +325,13 @@ class TapePlaneScene : GlScene {
         private const val TAPE_HEIGHT = 9.993885f
         private const val TAPE_THICKNESS = 0.06f
         private const val TAPE_SUBDIVISION_POWER = 2
+        private const val BACKGROUND_TEXTURE_UNIT_INDEX = 0
+        private const val SHADOW_GROUND_Z = -0.18f
+        private const val SHADOW_OFFSET_X = 0.02f
+        private const val SHADOW_OFFSET_Y = -0.08f
+        private const val SHADOW_ALPHA = 0.38f
+        private const val SHADOW_BASE_SOFTNESS = 0.045f
+        private const val SHADOW_HEIGHT_SOFTNESS = 0.10f
         private const val MIN_CAMERA_DISTANCE = 1.6f
         private const val MAX_CAMERA_DISTANCE = 8f
         private const val POINT_2_INDEX = 1
@@ -278,22 +346,24 @@ class TapePlaneScene : GlScene {
         private const val NANOS_PER_SECOND = 1_000_000_000f
         private const val MAX_MORPH_DELTA_SECONDS = 0.033f
         private const val MORPH_EPSILON = 0.0005f
-        private val POINT_SPRING_STIFFNESS = floatArrayOf(130f, 104f, 82f, 64f)
-        private val POINT_SPRING_DAMPING = floatArrayOf(8.2f, 7.4f, 6.8f, 6.2f)
+        private val POINT_SPRING_STIFFNESS = floatArrayOf(140f, 124f, 104f, 82f, 64f)
+        private val POINT_SPRING_DAMPING = floatArrayOf(8.8f, 8.2f, 7.4f, 6.8f, 6.2f)
 
         private val ZERO_STATE = TapeState(
             camera = CameraControls(
                 yawRadians = 0f,
                 elevationRadians = 1.35f,
-                distance = 7.65f
+                distance = 7.8f
             ),
             curvePoints = listOf(
                 PlaneGeometry.CurvePoint(0f, 0f, 0f),
-                PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT / 3f - 1.2f, 2.4f),
-                PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT * 2f / 3f - 3f, 0f),
+                PlaneGeometry.CurvePoint(0f, 0.72f, 0f),
+                PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT / 3f - 1.5f, 3.2f),
+                PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT * 2f / 3f - 3.4f, 0f),
                 PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT - 4.68f, 0.18f)
             ),
             curveWidths = listOf(
+                0.65f,
                 1f,
                 1f,
                 1.72f,
@@ -309,11 +379,13 @@ class TapePlaneScene : GlScene {
             ),
             curvePoints = listOf(
                 PlaneGeometry.CurvePoint(0f, 0f, 0f),
+                PlaneGeometry.CurvePoint(0f, 0.72f, 0f),
                 PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT / 3f, -0.06f),
                 PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT * 2f / 3f + 1.08f, 0f),
                 PlaneGeometry.CurvePoint(0f, TAPE_HEIGHT - 0.36f, 0.18f)
             ),
             curveWidths = listOf(
+                0.65f,
                 1f,
                 1f,
                 1.72f,
@@ -351,51 +423,143 @@ class TapePlaneScene : GlScene {
 
         private const val ATTRIBUTE_POSITION = "aPosition"
         private const val ATTRIBUTE_NORMAL = "aNormal"
-        private const val ATTRIBUTE_COLOR = "aColor"
         private const val UNIFORM_MVP = "uMvp"
-        private const val UNIFORM_TAPE_WIDTH = "uTapeWidth"
         private const val UNIFORM_TAPE_HEIGHT = "uTapeHeight"
+        private const val UNIFORM_HAS_BACKGROUND_TEXTURE = "uHasBackgroundTexture"
+        private const val UNIFORM_RESOLUTION = "uResolution"
+        private const val UNIFORM_BACKGROUND_TEXTURE = "uBackgroundTexture"
+        private const val UNIFORM_GRADIENT_START_COLOR = "uGradientStartColor"
+        private const val UNIFORM_GRADIENT_END_COLOR = "uGradientEndColor"
+        private const val UNIFORM_SHADOW_GROUND_Z = "uGroundZ"
+        private const val UNIFORM_SHADOW_OFFSET_X = "uShadowOffsetX"
+        private const val UNIFORM_SHADOW_OFFSET_Y = "uShadowOffsetY"
+        private const val UNIFORM_SHADOW_ALPHA = "uShadowAlpha"
+        private const val UNIFORM_SHADOW_TAPE_HEIGHT = "uTapeHeight"
+        private const val UNIFORM_SHADOW_TAPE_WIDTH = "uTapeWidth"
+        private const val UNIFORM_SHADOW_BASE_SOFTNESS = "uBaseSoftness"
+        private const val UNIFORM_SHADOW_HEIGHT_SOFTNESS = "uHeightSoftness"
+        private val DEFAULT_GRADIENT_START_COLOR = floatArrayOf(1.0f, 0.93f, 0.80f)
+        private val DEFAULT_GRADIENT_END_COLOR = floatArrayOf(1.0f, 0.55f, 0.10f)
 
         private const val VERTEX_SHADER = """
             uniform mat4 uMvp;
             attribute vec3 aPosition;
             attribute vec3 aNormal;
-            attribute vec4 aColor;
             varying vec3 vObjectPosition;
             varying vec3 vNormal;
-            varying vec4 vColor;
 
             void main() {
                 vObjectPosition = aPosition;
                 vNormal = aNormal;
-                vColor = aColor;
                 gl_Position = uMvp * vec4(aPosition, 1.0);
             }
         """
 
         private const val FRAGMENT_SHADER = """
             precision mediump float;
-            uniform float uTapeWidth;
+            uniform sampler2D uBackgroundTexture;
+            uniform float uHasBackgroundTexture;
+            uniform vec2 uResolution;
             uniform float uTapeHeight;
+            uniform vec3 uGradientStartColor;
+            uniform vec3 uGradientEndColor;
             varying vec3 vObjectPosition;
             varying vec3 vNormal;
-            varying vec4 vColor;
 
             void main() {
-                float centerDistance = abs(vObjectPosition.x) / (uTapeWidth * 0.5);
-                float sideEdge = smoothstep(0.88, 0.98, centerDistance);
-                float endEdge = max(
-                    smoothstep(0.02, 0.0, vObjectPosition.y),
-                    smoothstep(uTapeHeight - 0.02, uTapeHeight, vObjectPosition.y)
+                float gradientAmount = clamp(vObjectPosition.y / uTapeHeight, 0.0, 1.0);
+                vec3 normal = normalize(vNormal);
+                vec3 gradientColor = mix(uGradientStartColor, uGradientEndColor, gradientAmount);
+                float sideShape = pow(abs(normal.x), 1.35);
+                float depthShape = 1.0 - abs(normal.z);
+                float frontFacing = smoothstep(0.12, 0.82, normal.z);
+                float light = 0.92 + sideShape * 0.08 + frontFacing * 0.18 - depthShape * 0.035;
+                vec3 materialColor = mix(gradientColor * light, vec3(1.0), frontFacing * 0.12);
+
+                vec3 frostedColor = materialColor;
+                if (uHasBackgroundTexture > 0.5) {
+                    vec2 baseUv = vec2(
+                        gl_FragCoord.x / uResolution.x,
+                        1.0 - (gl_FragCoord.y / uResolution.y)
+                    );
+                    vec2 texel = vec2(1.0 / uResolution.x, 1.0 / uResolution.y);
+                    vec2 blur1 = texel * 3.5;
+                    vec2 blur2 = texel * 7.0;
+                    vec3 blurred = texture2D(uBackgroundTexture, baseUv).rgb * 0.20;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur1.x, 0.0)).rgb * 0.08;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(blur1.x, 0.0)).rgb * 0.08;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(0.0, blur1.y)).rgb * 0.08;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(0.0, blur1.y)).rgb * 0.08;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur1.x, blur1.y)).rgb * 0.055;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(blur1.x, blur1.y)).rgb * 0.055;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur1.x, -blur1.y)).rgb * 0.055;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(-blur1.x, blur1.y)).rgb * 0.055;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur2.x, 0.0)).rgb * 0.045;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(blur2.x, 0.0)).rgb * 0.045;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(0.0, blur2.y)).rgb * 0.045;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(0.0, blur2.y)).rgb * 0.045;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur2.x, blur2.y)).rgb * 0.025;
+                    blurred += texture2D(uBackgroundTexture, baseUv - vec2(blur2.x, blur2.y)).rgb * 0.025;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(blur2.x, -blur2.y)).rgb * 0.025;
+                    blurred += texture2D(uBackgroundTexture, baseUv + vec2(-blur2.x, blur2.y)).rgb * 0.025;
+
+                    vec3 frostedBase = mix(materialColor, blurred, 0.1);
+                    frostedColor = mix(frostedBase, vec3(1.0), 0.18);
+                }
+
+                gl_FragColor = vec4(frostedColor, 0.985);
+            }
+        """
+
+        private const val SHADOW_VERTEX_SHADER = """
+            precision mediump float;
+            uniform mat4 uMvp;
+            uniform float uGroundZ;
+            uniform float uShadowOffsetX;
+            uniform float uShadowOffsetY;
+            uniform float uBaseSoftness;
+            uniform float uHeightSoftness;
+            attribute vec3 aPosition;
+            varying vec3 vObjectPosition;
+            varying float vHeightAboveGround;
+
+            void main() {
+                vObjectPosition = aPosition;
+                vHeightAboveGround = max(aPosition.z - uGroundZ, 0.0);
+                float spread = uBaseSoftness + vHeightAboveGround * uHeightSoftness;
+                vec3 shadowPosition = vec3(
+                    aPosition.x + sign(aPosition.x) * spread + uShadowOffsetX,
+                    aPosition.y + uShadowOffsetY,
+                    uGroundZ
                 );
-                float centerHighlight = 1.0 - smoothstep(0.0, 0.68, centerDistance);
-                float faceLight = 0.82 + abs(vNormal.z) * 0.18;
+                gl_Position = uMvp * vec4(shadowPosition, 1.0);
+            }
+        """
 
-                vec3 baseColor = mix(vColor.rgb * faceLight, vec3(0.96, 0.99, 1.0), centerHighlight * 0.22);
-                baseColor = mix(baseColor, vec3(0.28, 0.58, 0.78), sideEdge * 0.55);
-                baseColor = mix(baseColor, vec3(0.25, 0.48, 0.66), endEdge * 0.7);
+        private const val SHADOW_FRAGMENT_SHADER = """
+            precision mediump float;
+            uniform float uShadowAlpha;
+            uniform float uTapeHeight;
+            uniform float uTapeWidth;
+            uniform float uBaseSoftness;
+            uniform float uHeightSoftness;
+            varying vec3 vObjectPosition;
+            varying float vHeightAboveGround;
 
-                gl_FragColor = vec4(baseColor, 1.);
+            void main() {
+                float halfWidth = uTapeWidth * 0.5;
+                float edgeDistance = max(halfWidth - abs(vObjectPosition.x), 0.0);
+                float softness = uBaseSoftness + vHeightAboveGround * uHeightSoftness;
+                float edgeFade = smoothstep(0.0, softness, edgeDistance);
+                float lengthFade = smoothstep(0.0, 0.12, vObjectPosition.y / uTapeHeight) *
+                    (1.0 - smoothstep(0.88, 1.0, vObjectPosition.y / uTapeHeight));
+                float heightFade = 1.0 - smoothstep(0.0, 2.4, vHeightAboveGround) * 0.34;
+                gl_FragColor = vec4(
+                    0.0,
+                    0.0,
+                    0.0,
+                    uShadowAlpha * edgeFade * heightFade * (0.72 + lengthFade * 0.28)
+                );
             }
         """
     }

@@ -30,6 +30,10 @@ class GlProgram(
         GLES20.glUniform2f(getUniform(name), value1, value2)
     }
 
+    fun setVec3(name: String, value1: Float, value2: Float, value3: Float) {
+        GLES20.glUniform3f(getUniform(name), value1, value2, value3)
+    }
+
     fun setMat4(name: String, value: FloatArray) {
         GLES20.glUniformMatrix4fv(getUniform(name), 1, false, value, 0)
     }

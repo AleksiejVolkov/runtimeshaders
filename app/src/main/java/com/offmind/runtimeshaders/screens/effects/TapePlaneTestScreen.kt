@@ -13,13 +13,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -35,28 +35,46 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.offmind.runtimeshaders.R
-import com.offmind.runtimeshaders.gl.compose.EmbeddedGlSurface
+import com.offmind.runtimeshaders.gl.compose.CapturedBackgroundGlBox
 import com.offmind.runtimeshaders.gl.scene.TapePlaneScene
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 fun TapePlaneTestScreen(paddingValues: PaddingValues) {
-    val scene = remember { TapePlaneScene() }
+    val tapeGradientStartColor = Color(0xFFE91E63)
+    val tapeGradientEndColor = Color(0xFF673AB7)
+    val scene = remember {
+        TapePlaneScene(
+            gradientStartColor = tapeGradientStartColor.toFloatArray(),
+            gradientEndColor = tapeGradientEndColor.toFloatArray()
+        )
+    }
     val navigationBarsPadding = WindowInsets.navigationBars.asPaddingValues()
     var cameraControls by remember { mutableStateOf(scene.cameraControls()) }
     var curvePointControls by remember { mutableStateOf(scene.curvePointControls()) }
     var sliderValue by remember { mutableStateOf(0f) }
+    var dragStartProgress by remember { mutableStateOf(0f) }
+    var dragOffsetX by remember { mutableStateOf(0f) }
+    val debug by remember { mutableStateOf(false) }
 
     fun refreshControls() {
         cameraControls = scene.cameraControls()
         curvePointControls = scene.curvePointControls()
     }
 
-    Box(
+    fun setMorphProgress(value: Float) {
+        sliderValue = value.coerceIn(0f, 1f)
+        scene.setMorphProgress(sliderValue)
+        refreshControls()
+    }
+
+    CapturedBackgroundGlBox(
+        scene = scene,
+        surfaceSize = DpSize(width = 340.dp, height = 180.dp),
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -69,7 +87,9 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
                 )
             )
             .padding(paddingValues),
-        contentAlignment = Alignment.Center
+        surfaceAlignment = Alignment.Center,
+        surfaceModifier = Modifier.size(width = 340.dp, height = 180.dp),
+        captureVersion = (sliderValue * 1000).toLong()
     ) {
         Image(
             painter = painterResource(id = R.drawable.generic_mountians),
@@ -78,82 +98,102 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
             alpha = 0.32f,
             modifier = Modifier.fillMaxSize()
         )
-        Box(modifier = Modifier.fillMaxSize().padding(top = 100.dp)) {
-            Slider(
-                value = sliderValue,
-                onValueChange = { value ->
-                    sliderValue = (value / SLIDER_STEP).roundToInt() * SLIDER_STEP
-                    scene.setMorphProgress(sliderValue)
-                    refreshControls()
-                },
-                valueRange = 0f..1f,
-                steps = SLIDER_STEPS,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-            )
-        }
         Box(
             modifier = Modifier
-                .padding(bottom = 100.dp)
-                .size(width = 340.dp, height = 35.dp).background(color = Color.DarkGray, shape = RoundedCornerShape(16.dp))
-        )
-        EmbeddedGlSurface(
-            scene = scene,
-            modifier = Modifier.size(width = 340.dp, height = 300.dp).padding(bottom = 100.dp)
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = navigationBarsPadding.calculateBottomPadding() + 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .align(Alignment.Center)
+                .size(width = 350.dp, height = 30.dp)
+                .padding(horizontal = 24.dp)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color(0xFF616161),
+                            0.12f to Color(0xFF9A9A9A),
+                            0.5f to Color(0xFFA8A8A8),
+                            0.9f to Color(0xFFC6C6C6),
+                            1f to Color(0xFFD7D7D7),
+                        )
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .pointerInput(scene) {
+                    detectDragGestures(
+                        onDragStart = {
+                            dragStartProgress = sliderValue
+                            dragOffsetX = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetX += dragAmount.x
+                            setMorphProgress(
+                                dragStartProgress + dragOffsetX / size.width.toFloat()
+                            )
+                        }
+                    )
+                }
         ) {
-            ValueText(
-                text = "camera yaw=${cameraControls.yawRadians.format()} elev=${cameraControls.elevationRadians.format()} dist=${cameraControls.distance.format()}"
+            Text(
+                text = "${(sliderValue * 100).toInt()}%",
+                color = Color.DarkGray.copy(alpha = 0.9f*(sliderValue*0.5f+0.5f)),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(horizontal = 6.dp)
+                    .align(Alignment.CenterEnd)
+
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+        }
+        if (debug) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navigationBarsPadding.calculateBottomPadding() + 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                ControlButton(
-                    label = "-",
-                    onClick = {
-                        scene.changeCameraDistance(CAMERA_DISTANCE_STEP)
+                ValueText(
+                    text = "camera yaw=${cameraControls.yawRadians.format()} elev=${cameraControls.elevationRadians.format()} dist=${cameraControls.distance.format()}"
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ControlButton(
+                        label = "-",
+                        onClick = {
+                            scene.changeCameraDistance(CAMERA_DISTANCE_STEP)
+                            refreshControls()
+                        }
+                    )
+                    OrbitPad(
+                        scene = scene,
+                        onOrbitChanged = ::refreshControls
+                    )
+                    ControlButton(
+                        label = "+",
+                        onClick = {
+                            scene.changeCameraDistance(-CAMERA_DISTANCE_STEP)
+                            refreshControls()
+                        }
+                    )
+                }
+                CurvePointControlsPanel(
+                    points = curvePointControls,
+                    onMovePoint = { pointIndex, deltaY, deltaZ ->
+                        scene.moveCurvePoint(
+                            index = pointIndex - 1,
+                            deltaY = deltaY,
+                            deltaZ = deltaZ
+                        )
                         refreshControls()
-                    }
-                )
-                OrbitPad(
-                    scene = scene,
-                    onOrbitChanged = ::refreshControls
-                )
-                ControlButton(
-                    label = "+",
-                    onClick = {
-                        scene.changeCameraDistance(-CAMERA_DISTANCE_STEP)
+                    },
+                    onChangeWidth = { pointIndex, delta ->
+                        scene.changeCurvePointWidth(
+                            index = pointIndex - 1,
+                            delta = delta
+                        )
                         refreshControls()
                     }
                 )
             }
-            CurvePointControlsPanel(
-                points = curvePointControls,
-                onMovePoint = { pointIndex, deltaY, deltaZ ->
-                    scene.moveCurvePoint(
-                        index = pointIndex - 1,
-                        deltaY = deltaY,
-                        deltaZ = deltaZ
-                    )
-                    refreshControls()
-                },
-                onChangeWidth = { pointIndex, delta ->
-                    scene.changeCurvePointWidth(
-                        index = pointIndex - 1,
-                        delta = delta
-                    )
-                    refreshControls()
-                }
-            )
         }
     }
 }
@@ -301,10 +341,13 @@ private fun Float.format(): String {
     return String.format(Locale.US, "%.2f", this)
 }
 
+private fun Color.toFloatArray(): FloatArray {
+    return floatArrayOf(red, green, blue)
+}
+
 private const val ORBIT_RADIANS_PER_PIXEL = 0.008f
 private const val CAMERA_DISTANCE_STEP = 0.35f
 private const val POINT_HEIGHT_STEP = 0.18f
 private const val POINT_Y_STEP = 0.18f
 private const val POINT_WIDTH_STEP = 0.12f
-private const val SLIDER_STEP = 0.05f
 private const val SLIDER_STEPS = 19

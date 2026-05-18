@@ -14,18 +14,18 @@ object PlaneGeometry {
         lengthSegments: Int = DEFAULT_LENGTH_SEGMENTS,
         subdivisionPower: Int = DEFAULT_SUBDIVISION_POWER,
         curvePoints: List<CurvePoint> = createStraightCurve(height),
-        curveWidths: List<Float> = List(CURVE_POINT_COUNT) { DEFAULT_CURVE_WIDTH }
+        curveWidths: List<Float> = List(curvePoints.size) { DEFAULT_CURVE_WIDTH }
     ): GlMesh {
         require(width > 0f) { "width must be greater than 0." }
         require(height > 0f) { "height must be greater than 0." }
         require(thickness >= 0f) { "thickness must be zero or greater." }
         require(lengthSegments >= 1) { "lengthSegments must be at least 1." }
         require(subdivisionPower >= 0) { "subdivisionPower must be zero or greater." }
-        require(curvePoints.size == CURVE_POINT_COUNT) {
-            "curvePoints must contain exactly $CURVE_POINT_COUNT points."
+        require(curvePoints.size >= MIN_CURVE_POINT_COUNT) {
+            "curvePoints must contain at least $MIN_CURVE_POINT_COUNT points."
         }
-        require(curveWidths.size == CURVE_POINT_COUNT) {
-            "curveWidths must contain exactly $CURVE_POINT_COUNT values."
+        require(curveWidths.size == curvePoints.size) {
+            "curveWidths must contain exactly one value per curve point."
         }
 
         val vertices = mutableListOf<Float>()
@@ -424,7 +424,7 @@ object PlaneGeometry {
     private const val DEFAULT_SUBDIVISION_POWER = 2
     private const val DEFAULT_CAP_SEGMENTS = 8
     private const val DEFAULT_CURVE_WIDTH = 1f
-    private const val CURVE_POINT_COUNT = 4
+    private const val MIN_CURVE_POINT_COUNT = 2
     private const val PI = kotlin.math.PI.toFloat()
     private val LEFT_SIDE_NORMAL = floatArrayOf(-1f, 0f, 0f)
     private val RIGHT_SIDE_NORMAL = floatArrayOf(1f, 0f, 0f)
