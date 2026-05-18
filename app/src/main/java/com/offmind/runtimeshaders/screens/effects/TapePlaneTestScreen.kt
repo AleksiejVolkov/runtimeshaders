@@ -41,6 +41,7 @@ import com.offmind.runtimeshaders.R
 import com.offmind.runtimeshaders.gl.compose.EmbeddedGlSurface
 import com.offmind.runtimeshaders.gl.scene.TapePlaneScene
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun TapePlaneTestScreen(paddingValues: PaddingValues) {
@@ -81,7 +82,9 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
             Slider(
                 value = sliderValue,
                 onValueChange = { value ->
-                    sliderValue = (value / SLIDER_STEP).toInt() * SLIDER_STEP
+                    sliderValue = (value / SLIDER_STEP).roundToInt() * SLIDER_STEP
+                    scene.setMorphProgress(sliderValue)
+                    refreshControls()
                 },
                 valueRange = 0f..1f,
                 steps = SLIDER_STEPS,
@@ -91,6 +94,11 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
                     .padding(horizontal = 24.dp)
             )
         }
+        Box(
+            modifier = Modifier
+                .padding(bottom = 100.dp)
+                .size(width = 340.dp, height = 35.dp).background(color = Color.DarkGray, shape = RoundedCornerShape(16.dp))
+        )
         EmbeddedGlSurface(
             scene = scene,
             modifier = Modifier.size(width = 340.dp, height = 300.dp).padding(bottom = 100.dp)
