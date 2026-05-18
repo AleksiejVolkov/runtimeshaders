@@ -10,42 +10,121 @@ object PlaneGeometry {
     fun createTapePlane(
         width: Float = DEFAULT_WIDTH,
         height: Float = DEFAULT_HEIGHT,
+        thickness: Float = DEFAULT_THICKNESS,
         lengthSegments: Int = DEFAULT_LENGTH_SEGMENTS,
-        curvePoints: List<CurvePoint> = createStraightCurve(height)
+        subdivisionPower: Int = DEFAULT_SUBDIVISION_POWER,
+        curvePoints: List<CurvePoint> = createStraightCurve(height),
+        curveWidths: List<Float> = List(CURVE_POINT_COUNT) { DEFAULT_CURVE_WIDTH }
     ): GlMesh {
         require(width > 0f) { "width must be greater than 0." }
         require(height > 0f) { "height must be greater than 0." }
+        require(thickness >= 0f) { "thickness must be zero or greater." }
         require(lengthSegments >= 1) { "lengthSegments must be at least 1." }
+        require(subdivisionPower >= 0) { "subdivisionPower must be zero or greater." }
         require(curvePoints.size == CURVE_POINT_COUNT) {
             "curvePoints must contain exactly $CURVE_POINT_COUNT points."
+        }
+        require(curveWidths.size == CURVE_POINT_COUNT) {
+            "curveWidths must contain exactly $CURVE_POINT_COUNT values."
         }
 
         val vertices = mutableListOf<Float>()
         val halfWidth = width * 0.5f
-        val sections = List(lengthSegments + 1) { index ->
-            val amount = index.toFloat() / lengthSegments
-            val center = sampleCurve(curvePoints, amount)
-            val tangent = sampleTangent(curvePoints, amount)
+        val halfThickness = thickness * 0.5f
+        val subdivisions = 1 shl subdivisionPower
+        val geometrySegments = lengthSegments * subdivisions
+        val sections = List(geometrySegments + 1) { index ->
+            val amount = index.toFloat() / geometrySegments
+            val center = sampleCurve(curvePoints, curveWidths, amount)
+            val tangent = sampleTangent(curvePoints, curveWidths, amount)
+            val surfaceNormal = normalFromTangent(tangent)
             TapeSection(
-                left = floatArrayOf(center.x - halfWidth, center.y, center.z),
-                right = floatArrayOf(center.x + halfWidth, center.y, center.z),
-                normal = normalFromTangent(tangent),
+                leftFront = offsetPosition(
+                    position = floatArrayOf(center.x - halfWidth, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = halfThickness
+                ),
+                rightFront = offsetPosition(
+                    position = floatArrayOf(center.x + halfWidth, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = halfThickness
+                ),
+                leftBack = offsetPosition(
+                    position = floatArrayOf(center.x - halfWidth, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = -halfThickness
+                ),
+                rightBack = offsetPosition(
+                    position = floatArrayOf(center.x + halfWidth, center.y, center.z),
+                    normal = surfaceNormal,
+                    distance = -halfThickness
+                ),
+                frontNormal = surfaceNormal,
+                backNormal = opposite(surfaceNormal),
                 color = colorForSegment(amount)
             )
         }
 
-        for (segment in 0 until lengthSegments) {
+        for (segment in 0 until geometrySegments) {
             val start = sections[segment]
             val end = sections[segment + 1]
 
-            addVertex(vertices, start.left, start.normal, start.color)
-            addVertex(vertices, start.right, start.normal, start.color)
-            addVertex(vertices, end.right, end.normal, end.color)
-
-            addVertex(vertices, start.left, start.normal, start.color)
-            addVertex(vertices, end.right, end.normal, end.color)
-            addVertex(vertices, end.left, end.normal, end.color)
+            addQuad(
+                vertices = vertices,
+                bottomLeft = start.leftFront,
+                bottomRight = start.rightFront,
+                topRight = end.rightFront,
+                topLeft = end.leftFront,
+                bottomNormal = start.frontNormal,
+                topNormal = end.frontNormal,
+                bottomColor = start.color,
+                topColor = end.color
+            )
+            addQuad(
+                vertices = vertices,
+                bottomLeft = start.rightBack,
+                bottomRight = start.leftBack,
+                topRight = end.leftBack,
+                topLeft = end.rightBack,
+                bottomNormal = start.backNormal,
+                topNormal = end.backNormal,
+                bottomColor = start.color,
+                topColor = end.color
+            )
+            addQuad(
+                vertices = vertices,
+                bottomLeft = start.leftBack,
+                bottomRight = start.leftFront,
+                topRight = end.leftFront,
+                topLeft = end.leftBack,
+                bottomNormal = LEFT_SIDE_NORMAL,
+                topNormal = LEFT_SIDE_NORMAL,
+                bottomColor = start.color,
+                topColor = end.color
+            )
+            addQuad(
+                vertices = vertices,
+                bottomLeft = start.rightFront,
+                bottomRight = start.rightBack,
+                topRight = end.rightBack,
+                topLeft = end.rightFront,
+                bottomNormal = RIGHT_SIDE_NORMAL,
+                topNormal = RIGHT_SIDE_NORMAL,
+                bottomColor = start.color,
+                topColor = end.color
+            )
         }
+
+        addCap(
+            vertices = vertices,
+            section = sections.first(),
+            normal = START_CAP_NORMAL
+        )
+        addCap(
+            vertices = vertices,
+            section = sections.last(),
+            normal = END_CAP_NORMAL
+        )
 
         return GlMesh(
             vertices = vertices.toFloatArray(),
@@ -54,11 +133,48 @@ object PlaneGeometry {
     }
 
     private data class TapeSection(
-        val left: FloatArray,
-        val right: FloatArray,
-        val normal: FloatArray,
+        val leftFront: FloatArray,
+        val rightFront: FloatArray,
+        val leftBack: FloatArray,
+        val rightBack: FloatArray,
+        val frontNormal: FloatArray,
+        val backNormal: FloatArray,
         val color: FloatArray
     )
+
+    private fun addQuad(
+        vertices: MutableList<Float>,
+        bottomLeft: FloatArray,
+        bottomRight: FloatArray,
+        topRight: FloatArray,
+        topLeft: FloatArray,
+        bottomNormal: FloatArray,
+        topNormal: FloatArray,
+        bottomColor: FloatArray,
+        topColor: FloatArray
+    ) {
+        addVertex(vertices, bottomLeft, bottomNormal, bottomColor)
+        addVertex(vertices, bottomRight, bottomNormal, bottomColor)
+        addVertex(vertices, topRight, topNormal, topColor)
+
+        addVertex(vertices, bottomLeft, bottomNormal, bottomColor)
+        addVertex(vertices, topRight, topNormal, topColor)
+        addVertex(vertices, topLeft, topNormal, topColor)
+    }
+
+    private fun addCap(
+        vertices: MutableList<Float>,
+        section: TapeSection,
+        normal: FloatArray
+    ) {
+        addVertex(vertices, section.leftBack, normal, section.color)
+        addVertex(vertices, section.rightBack, normal, section.color)
+        addVertex(vertices, section.rightFront, normal, section.color)
+
+        addVertex(vertices, section.leftBack, normal, section.color)
+        addVertex(vertices, section.rightFront, normal, section.color)
+        addVertex(vertices, section.leftFront, normal, section.color)
+    }
 
     private fun addVertex(
         vertices: MutableList<Float>,
@@ -80,39 +196,52 @@ object PlaneGeometry {
         )
     }
 
-    private fun sampleCurve(points: List<CurvePoint>, amount: Float): CurvePoint {
+    private fun sampleCurve(
+        points: List<CurvePoint>,
+        widths: List<Float>,
+        amount: Float
+    ): CurvePoint {
         val scaledAmount = amount.coerceIn(0f, 1f) * (points.lastIndex)
         val segmentIndex = scaledAmount.toInt().coerceAtMost(points.lastIndex - 1)
         val localAmount = scaledAmount - segmentIndex
         return cubicHermite(
             start = points[segmentIndex],
             end = points[segmentIndex + 1],
-            startTangent = tangentAt(points, segmentIndex),
-            endTangent = tangentAt(points, segmentIndex + 1),
+            startTangent = tangentAt(points, widths, segmentIndex),
+            endTangent = tangentAt(points, widths, segmentIndex + 1),
             amount = localAmount
         )
     }
 
-    private fun sampleTangent(points: List<CurvePoint>, amount: Float): CurvePoint {
+    private fun sampleTangent(
+        points: List<CurvePoint>,
+        widths: List<Float>,
+        amount: Float
+    ): CurvePoint {
         val scaledAmount = amount.coerceIn(0f, 1f) * (points.lastIndex)
         val segmentIndex = scaledAmount.toInt().coerceAtMost(points.lastIndex - 1)
         val localAmount = scaledAmount - segmentIndex
         return cubicHermiteTangent(
             start = points[segmentIndex],
             end = points[segmentIndex + 1],
-            startTangent = tangentAt(points, segmentIndex),
-            endTangent = tangentAt(points, segmentIndex + 1),
+            startTangent = tangentAt(points, widths, segmentIndex),
+            endTangent = tangentAt(points, widths, segmentIndex + 1),
             amount = localAmount
         )
     }
 
-    private fun tangentAt(points: List<CurvePoint>, index: Int): CurvePoint {
+    private fun tangentAt(
+        points: List<CurvePoint>,
+        widths: List<Float>,
+        index: Int
+    ): CurvePoint {
         val previous = points[(index - 1).coerceAtLeast(0)]
         val next = points[(index + 1).coerceAtMost(points.lastIndex)]
+        val width = widths[index]
         return CurvePoint(
-            x = (next.x - previous.x) * 0.5f,
-            y = (next.y - previous.y) * 0.5f,
-            z = (next.z - previous.z) * 0.5f
+            x = (next.x - previous.x) * 0.5f * width,
+            y = (next.y - previous.y) * 0.5f * width,
+            z = (next.z - previous.z) * 0.5f * width
         )
     }
 
@@ -169,6 +298,22 @@ object PlaneGeometry {
         return floatArrayOf(0f, normalY / length, normalZ / length)
     }
 
+    private fun offsetPosition(
+        position: FloatArray,
+        normal: FloatArray,
+        distance: Float
+    ): FloatArray {
+        return floatArrayOf(
+            position[0] + normal[0] * distance,
+            position[1] + normal[1] * distance,
+            position[2] + normal[2] * distance
+        )
+    }
+
+    private fun opposite(normal: FloatArray): FloatArray {
+        return floatArrayOf(-normal[0], -normal[1], -normal[2])
+    }
+
     private fun lerp(start: Float, end: Float, amount: Float): Float {
         return start + (end - start) * amount
     }
@@ -184,6 +329,13 @@ object PlaneGeometry {
 
     private const val DEFAULT_WIDTH = 0.804704f
     private const val DEFAULT_HEIGHT = 9.993885f
+    private const val DEFAULT_THICKNESS = 0.16f
     private const val DEFAULT_LENGTH_SEGMENTS = 16
+    private const val DEFAULT_SUBDIVISION_POWER = 2
+    private const val DEFAULT_CURVE_WIDTH = 1f
     private const val CURVE_POINT_COUNT = 4
+    private val LEFT_SIDE_NORMAL = floatArrayOf(-1f, 0f, 0f)
+    private val RIGHT_SIDE_NORMAL = floatArrayOf(1f, 0f, 0f)
+    private val START_CAP_NORMAL = floatArrayOf(0f, -1f, 0f)
+    private val END_CAP_NORMAL = floatArrayOf(0f, 1f, 0f)
 }

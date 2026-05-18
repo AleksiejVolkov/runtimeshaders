@@ -11,10 +11,25 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 class TapePlaneScene : GlScene {
+    data class CameraControls(
+        val yawRadians: Float,
+        val elevationRadians: Float,
+        val distance: Float
+    )
+
+    data class CurvePointControls(
+        val index: Int,
+        val x: Float,
+        val y: Float,
+        val z: Float,
+        val width: Float
+    )
+
     private var program: GlProgram? = null
     private val curvePoints = createDefaultTapeCurvePoints().toMutableList()
+    private val curveWidths = MutableList(curvePoints.size) { DEFAULT_CURVE_WIDTH }
     @Volatile
-    private var mesh: GlMesh = createMesh(curvePoints)
+    private var mesh: GlMesh = createMesh(curvePoints, curveWidths)
     @Volatile
     private var orbitYawRadians = DEFAULT_ORBIT_YAW_RADIANS
     @Volatile
@@ -97,12 +112,46 @@ class TapePlaneScene : GlScene {
     }
 
     fun movePoint2Height(delta: Float) {
+        moveCurvePoint(index = POINT_2_INDEX, deltaY = 0f, deltaZ = delta)
+    }
+
+    fun moveCurvePoint(index: Int, deltaY: Float, deltaZ: Float) {
         synchronized(curvePoints) {
-            val point = curvePoints[POINT_2_INDEX]
-            curvePoints[POINT_2_INDEX] = point.copy(
-                z = (point.z + delta).coerceIn(MIN_POINT_HEIGHT, MAX_POINT_HEIGHT)
+            val point = curvePoints[index]
+            curvePoints[index] = point.copy(
+                y = (point.y + deltaY).coerceIn(MIN_POINT_Y, MAX_POINT_Y),
+                z = (point.z + deltaZ).coerceIn(MIN_POINT_HEIGHT, MAX_POINT_HEIGHT)
             )
-            mesh = createMesh(curvePoints)
+            mesh = createMesh(curvePoints, curveWidths)
+        }
+    }
+
+    fun changeCurvePointWidth(index: Int, delta: Float) {
+        synchronized(curvePoints) {
+            curveWidths[index] = (curveWidths[index] + delta).coerceIn(MIN_CURVE_WIDTH, MAX_CURVE_WIDTH)
+            mesh = createMesh(curvePoints, curveWidths)
+        }
+    }
+
+    fun cameraControls(): CameraControls {
+        return CameraControls(
+            yawRadians = orbitYawRadians,
+            elevationRadians = orbitElevationRadians,
+            distance = cameraDistance
+        )
+    }
+
+    fun curvePointControls(): List<CurvePointControls> {
+        return synchronized(curvePoints) {
+            curvePoints.mapIndexed { index, point ->
+                CurvePointControls(
+                    index = index + 1,
+                    x = point.x,
+                    y = point.y,
+                    z = point.z,
+                    width = curveWidths[index]
+                )
+            }
         }
     }
 
@@ -127,12 +176,19 @@ class TapePlaneScene : GlScene {
         private const val TAPE_WIDTH = 0.804704f
         private const val TAPE_HEIGHT = 9.993885f
         private const val TAPE_SEGMENTS = 16f
+        private const val TAPE_THICKNESS = 0.16f
+        private const val TAPE_SUBDIVISION_POWER = 2
         private const val DEFAULT_CAMERA_DISTANCE = 3.1f
         private const val MIN_CAMERA_DISTANCE = 1.6f
         private const val MAX_CAMERA_DISTANCE = 8f
         private const val POINT_2_INDEX = 1
+        private const val MIN_POINT_Y = -1.5f
+        private const val MAX_POINT_Y = TAPE_HEIGHT + 1.5f
         private const val MIN_POINT_HEIGHT = -2.4f
         private const val MAX_POINT_HEIGHT = 2.4f
+        private const val DEFAULT_CURVE_WIDTH = 1f
+        private const val MIN_CURVE_WIDTH = 0.1f
+        private const val MAX_CURVE_WIDTH = 2.8f
         private const val DEFAULT_ORBIT_YAW_RADIANS = 0f
         private const val DEFAULT_ORBIT_ELEVATION_RADIANS = 0.7853982f
         private const val MIN_ORBIT_ELEVATION_RADIANS = 0.17453292f
@@ -147,8 +203,16 @@ class TapePlaneScene : GlScene {
             )
         }
 
-        private fun createMesh(curvePoints: List<PlaneGeometry.CurvePoint>): GlMesh {
-            return PlaneGeometry.createTapePlane(curvePoints = curvePoints.toList())
+        private fun createMesh(
+            curvePoints: List<PlaneGeometry.CurvePoint>,
+            curveWidths: List<Float>
+        ): GlMesh {
+            return PlaneGeometry.createTapePlane(
+                thickness = TAPE_THICKNESS,
+                subdivisionPower = TAPE_SUBDIVISION_POWER,
+                curvePoints = curvePoints.toList(),
+                curveWidths = curveWidths.toList()
+            )
         }
 
         private const val ATTRIBUTE_POSITION = "aPosition"
