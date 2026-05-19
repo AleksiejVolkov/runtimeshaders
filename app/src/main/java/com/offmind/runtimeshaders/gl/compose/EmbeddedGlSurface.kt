@@ -52,4 +52,3 @@ fun EmbeddedGlSurface(
         }
     }
 }
-git s
