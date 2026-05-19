@@ -1,6 +1,7 @@
 package com.offmind.runtimeshaders
 
 import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,7 +13,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val backStack = rememberNavBackStack(Route.EffectsList)
             RuntimeShadersTheme {
-                Scaffold { paddingValues ->
+                Box(modifier = Modifier.fillMaxSize()) {
                     val backEventState = rememberNavigationEventState(
                         currentInfo = NavigationEventInfo.None,
                         backInfo = if (backStack.size > 1) {
@@ -89,8 +89,7 @@ class MainActivity : ComponentActivity() {
                         if (underlayRoute != null) {
                             RouteContent(
                                 route = underlayRoute,
-                                onEffectSelected = { backStack.add(it) },
-                                paddingValues = paddingValues
+                                onEffectSelected = { backStack.add(it) }
                             )
                         }
 
@@ -107,36 +106,35 @@ class MainActivity : ComponentActivity() {
                                     entry<Route.EffectsList> { route ->
                                         RouteContent(
                                             route = route,
-                                            onEffectSelected = { backStack.add(it) },
-                                            paddingValues = paddingValues
+                                            onEffectSelected = { backStack.add(it) }
                                         )
                                     }
                                     entry<Route.LampShadow> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.Waveshock> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.SnowedDialog> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.TestShader> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.TapePlaneTest> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.CircleTimer> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.CanvasDeform> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.Metaballs> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                     entry<Route.ColorfulToggle> { route ->
-                                        RouteContent(route, { backStack.add(it) }, paddingValues)
+                                        RouteContent(route, { backStack.add(it) })
                                     }
                                 }
                             )
@@ -180,8 +178,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RouteContent(
     route: Route,
-    onEffectSelected: (Route) -> Unit,
-    paddingValues: androidx.compose.foundation.layout.PaddingValues
+    onEffectSelected: (Route) -> Unit
 ) {
     when (route) {
         is Route.EffectsList -> AllEffectsListScreen(
@@ -191,13 +188,13 @@ private fun RouteContent(
 
         is Route.LampShadow -> LampWithShadowScreen()
         is Route.Waveshock -> WaveshockOnTapScreen()
-        is Route.SnowedDialog -> SnowDialogScreen(paddingValues = paddingValues)
-        is Route.TestShader -> TestShaderScreen(paddingValues = paddingValues)
-        is Route.TapePlaneTest -> TapePlaneTestScreen(paddingValues = paddingValues)
-        is Route.CircleTimer -> TimerShaderScreen(paddingValues = paddingValues)
-        is Route.CanvasDeform -> CanvasDeformScreen(paddingValues = paddingValues)
-        is Route.Metaballs -> MetaballsShaderScreen(paddingValues = paddingValues)
-        is Route.ColorfulToggle -> ColorfulToggleScreen(paddingValues = paddingValues)
+        is Route.SnowedDialog -> SnowDialogScreen()
+        is Route.TestShader -> TestShaderScreen()
+        is Route.TapePlaneTest -> TapePlaneTestScreen()
+        is Route.CircleTimer -> TimerShaderScreen()
+        is Route.CanvasDeform -> CanvasDeformScreen()
+        is Route.Metaballs -> MetaballsShaderScreen()
+        is Route.ColorfulToggle -> ColorfulToggleScreen()
     }
 }
 
@@ -272,6 +269,8 @@ private fun PredictiveBackShaderLayer(
             if (state.progress > 0f) {
                 val centerX = if (state.touch.x.isInfinite()) size.width else state.touch.x
                 compositingStrategy = CompositingStrategy.Offscreen
+                alpha = 1f - ((state.progress - 1f) / (BACK_COMPLETE_PROGRESS - 1f))
+                    .coerceIn(0f, 1f)
                 shader.setFloatUniform("resolution", size.width, size.height)
                 shader.setFloatUniform("touch", centerX, state.touch.y)
                 shader.setFloatUniform("progress", state.progress)
@@ -280,6 +279,7 @@ private fun PredictiveBackShaderLayer(
                     .createRuntimeShaderEffect(shader, "image")
                     .asComposeRenderEffect()
             } else {
+                alpha = 1f
                 renderEffect = null
             }
         }
@@ -311,9 +311,45 @@ private val predictiveBackAlphaCircleShader = """
     }
 """.trimIndent()
 
-private const val BACK_COMPLETE_DURATION_MS = 180
+private val predictiveBackHumpMaskShader = """
+    half4 main(float2 fragCoord) {
+        half4 color = image.eval(fragCoord);
+        float completion = smoothstep(1.0, 1.7, progress);
+        float easedProgress = mix(CubicOut(clamp(progress, 0.0, 1.0)), 1.65, completion);
+        float edgeSign = edge < 0.5 ? 1.0 : -1.0;
+        float fromEdge = edge < 0.5 ? fragCoord.x : resolution.x - fragCoord.x;
+
+        float verticalDistance = abs(fragCoord.y - touch.y) / resolution.y;
+        float verticalRange = mix(0.46, 1.35, completion);
+        float verticalPower = mix(2.4, 0.62, completion);
+        float verticalProfile = 1.0 - smoothstep(0.0, verticalRange, verticalDistance);
+        verticalProfile = pow(verticalProfile, verticalPower);
+
+        float maxReach = resolution.x * mix(0.68, 1.45, completion) * easedProgress;
+        float waveFront = maxReach * verticalProfile;
+        float alphaFeather = mix(6.0, 18.0, easedProgress);
+        float deformationFeather = mix(18.0, 72.0, easedProgress);
+        float mask = 1.0 - smoothstep(waveFront - alphaFeather, waveFront + alphaFeather, fromEdge);
+        mask *= smoothstep(0.0, 0.08, easedProgress);
+
+        float frontBand = 1.0 - smoothstep(0.0, deformationFeather * 4.2, abs(fromEdge - waveFront));
+        float pull = frontBand * verticalProfile * easedProgress;
+        float direction = sign(waveFront - fromEdge);
+        float2 sampleCoord = fragCoord;
+        sampleCoord.x -= edgeSign * direction * pull * resolution.x * 0.16;
+        sampleCoord.y -= sign(fragCoord.y - touch.y) * pull * resolution.y * 0.045;
+        sampleCoord = clamp(sampleCoord, vec2(0.0), resolution);
+
+        half4 warpedColor = image.eval(sampleCoord);
+        float alpha = 1.0 - mask;
+
+        return half4(warpedColor.rgb * alpha, warpedColor.a * alpha);
+    }
+""".trimIndent()
+
+private const val BACK_COMPLETE_DURATION_MS = 260
 private const val BACK_CANCEL_DURATION_MS = 140
-private const val BACK_COMPLETE_PROGRESS = 1.15f
+private const val BACK_COMPLETE_PROGRESS = 1.7f
 private const val BACK_POP_DELAY_MS = 32L
 private const val BACK_RESET_FRAME_DELAY = 5
 private val noNavDisplayTransition = ContentTransform(

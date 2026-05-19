@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,7 +35,7 @@ import com.offmind.runtimeshaders.gl.compose.CapturedBackgroundGlBox
 import com.offmind.runtimeshaders.gl.scene.RotatingGlassCubeScene
 
 @Composable
-fun TestShaderScreen(paddingValues: PaddingValues) {
+fun TestShaderScreen() {
     val scene = remember { RotatingGlassCubeScene() }
     val glassSurfaceSize = 400.dp
     val listState = rememberLazyListState()

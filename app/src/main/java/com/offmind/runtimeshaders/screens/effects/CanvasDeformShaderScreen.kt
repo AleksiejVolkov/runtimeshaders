@@ -36,7 +36,7 @@ val ElasticOutEasing = Easing { t ->
 }
 
 @Composable
-fun CanvasDeformScreen(paddingValues: PaddingValues) {
+fun CanvasDeformScreen() {
     val shader = remember { RuntimeShader(runtimeShader) }
     var targetPercentage by remember { mutableFloatStateOf(0f) }
     val percentage = animateFloatAsState(targetValue = targetPercentage, animationSpec = tween(durationMillis = 1000, easing = ElasticOutEasing))
