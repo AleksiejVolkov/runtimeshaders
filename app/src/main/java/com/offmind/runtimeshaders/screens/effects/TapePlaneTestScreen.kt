@@ -98,48 +98,50 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
             alpha = 0.32f,
             modifier = Modifier.fillMaxSize()
         )
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(width = 350.dp, height = 30.dp)
-                .padding(horizontal = 24.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to Color(0xFF616161),
-                            0.12f to Color(0xFF9A9A9A),
-                            0.5f to Color(0xFFA8A8A8),
-                            0.9f to Color(0xFFC6C6C6),
-                            1f to Color(0xFFD7D7D7),
-                        )
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .pointerInput(scene) {
-                    detectDragGestures(
-                        onDragStart = {
-                            dragStartProgress = sliderValue
-                            dragOffsetX = 0f
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragOffsetX += dragAmount.x
-                            setMorphProgress(
-                                dragStartProgress + dragOffsetX / size.width.toFloat()
-                            )
-                        }
-                    )
-                }
-        ) {
-            Text(
-                text = "${(sliderValue * 100).toInt()}%",
-                color = Color.DarkGray.copy(alpha = 0.9f*(sliderValue*0.5f+0.5f)),
-                fontWeight = FontWeight.Bold,
+        if(debug.not()) {
+            Box(
                 modifier = Modifier
-                    .padding(horizontal = 6.dp)
-                    .align(Alignment.CenterEnd)
+                    .align(Alignment.Center)
+                    .size(width = 350.dp, height = 30.dp)
+                    .padding(horizontal = 24.dp)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color(0xFF616161),
+                                0.12f to Color(0xFF9A9A9A),
+                                0.5f to Color(0xFFA8A8A8),
+                                0.9f to Color(0xFFC6C6C6),
+                                1f to Color(0xFFD7D7D7),
+                            )
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .pointerInput(scene) {
+                        detectDragGestures(
+                            onDragStart = {
+                                dragStartProgress = sliderValue
+                                dragOffsetX = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffsetX += dragAmount.x
+                                setMorphProgress(
+                                    dragStartProgress + dragOffsetX / size.width.toFloat()
+                                )
+                            }
+                        )
+                    }
+            ) {
+                Text(
+                    text = "${(sliderValue * 100).toInt()}%",
+                    color = Color.DarkGray.copy(alpha = 0.9f * (sliderValue * 0.5f + 0.5f)),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(horizontal = 6.dp)
+                        .align(Alignment.CenterEnd)
 
-            )
+                )
+            }
         }
         if (debug) {
             Column(
