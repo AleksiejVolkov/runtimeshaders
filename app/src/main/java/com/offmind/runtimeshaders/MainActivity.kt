@@ -1,18 +1,27 @@
 package com.offmind.runtimeshaders
 
 import android.graphics.RenderEffect
-import android.graphics.RuntimeShader
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -26,11 +35,16 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.offmind.runtimeshaders.generated.ShaderFunction
 import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
 import com.offmind.runtimeshaders.screens.effects.*
+import com.offmind.runtimeshaders.shaders.Shader
+import com.offmind.runtimeshaders.shaders.Uniform
 import com.offmind.runtimeshaders.ui.theme.RuntimeShadersTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -50,14 +64,31 @@ class MainActivity : ComponentActivity() {
                             emptyList()
                         }
                     )
-                    val shaderState = backEventState.toShaderState()
+                    var gestureSession by remember { mutableIntStateOf(0) }
+                    val terminalProgress = remember { Animatable(0f) }
+                    val scope = rememberCoroutineScope()
+                    val gestureShaderState = backEventState.toShaderState(resetToken = gestureSession)
+
+                    LaunchedEffect(gestureShaderState.progress) {
+                        if (gestureShaderState.progress > 0f) {
+                            terminalProgress.snapTo(gestureShaderState.progress)
+                        }
+                    }
+
+                    val shaderState = gestureShaderState.copy(
+                        progress = maxOf(gestureShaderState.progress, terminalProgress.value)
+                    )
 
                     Box(modifier = Modifier.fillMaxSize()) {
-                        val previousRoute = backStack.dropLast(1).lastOrNull() as? Route
+                        val underlayRoute = if (shaderState.progress > 0f) {
+                            (backStack.dropLast(1).lastOrNull() ?: backStack.lastOrNull()) as? Route
+                        } else {
+                            null
+                        }
 
-                        if (shaderState.progress > 0f && previousRoute != null) {
+                        if (underlayRoute != null) {
                             RouteContent(
-                                route = previousRoute,
+                                route = underlayRoute,
                                 onEffectSelected = { backStack.add(it) },
                                 paddingValues = paddingValues
                             )
@@ -70,6 +101,8 @@ class MainActivity : ComponentActivity() {
                             NavDisplay(
                                 backStack = backStack,
                                 onBack = { backStack.removeLastOrNull() },
+                                popTransitionSpec = { noNavDisplayTransition },
+                                predictivePopTransitionSpec = { noNavDisplayTransition },
                                 entryProvider = entryProvider {
                                     entry<Route.EffectsList> { route ->
                                         RouteContent(
@@ -113,7 +146,30 @@ class MainActivity : ComponentActivity() {
                     NavigationBackHandler(
                         state = backEventState,
                         isBackEnabled = backStack.size > 1,
-                        onBackCompleted = { backStack.removeLastOrNull() }
+                        onBackCancelled = {
+                            scope.launch {
+                                terminalProgress.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = BACK_CANCEL_DURATION_MS)
+                                )
+                                gestureSession++
+                            }
+                        },
+                        onBackCompleted = {
+                            scope.launch {
+                                terminalProgress.animateTo(
+                                    targetValue = BACK_COMPLETE_PROGRESS,
+                                    animationSpec = tween(durationMillis = BACK_COMPLETE_DURATION_MS)
+                                )
+                                delay(BACK_POP_DELAY_MS)
+                                backStack.removeLastOrNull()
+                                repeat(BACK_RESET_FRAME_DELAY) {
+                                    withFrameNanos { }
+                                }
+                                terminalProgress.snapTo(0f)
+                                gestureSession++
+                            }
+                        }
                     )
                 }
             }
@@ -152,33 +208,40 @@ private data class PredictiveBackShaderState(
 )
 
 @Composable
-private fun androidx.navigationevent.compose.NavigationEventState<NavigationEventInfo.None>.toShaderState(): PredictiveBackShaderState {
+private fun androidx.navigationevent.compose.NavigationEventState<NavigationEventInfo.None>.toShaderState(
+    resetToken: Int
+): PredictiveBackShaderState {
     val transitionState = transitionState
     val latestEvent = (transitionState as? NavigationEventTransitionState.InProgress)?.latestEvent
     val startTouchY = remember { mutableStateOf<Float?>(null) }
+    val lastTouch = remember { mutableStateOf(Offset.Zero) }
+    val lastSwipeEdge = remember { mutableIntStateOf(NavigationEvent.EDGE_NONE) }
 
-    LaunchedEffect(latestEvent == null) {
-        if (latestEvent == null) {
-            startTouchY.value = null
-        }
+    LaunchedEffect(resetToken) {
+        startTouchY.value = null
+        lastTouch.value = Offset.Zero
+        lastSwipeEdge.intValue = NavigationEvent.EDGE_NONE
     }
 
     if (latestEvent != null && startTouchY.value == null) {
         startTouchY.value = latestEvent.touchY
     }
+    if (latestEvent != null) {
+        val touch = Offset(
+            x = when (latestEvent.swipeEdge) {
+                NavigationEvent.EDGE_RIGHT -> Float.POSITIVE_INFINITY
+                else -> 0f
+            },
+            y = startTouchY.value ?: latestEvent.touchY
+        )
+        lastTouch.value = touch
+        lastSwipeEdge.intValue = latestEvent.swipeEdge
+    }
 
     return PredictiveBackShaderState(
         progress = latestEvent?.progress ?: 0f,
-        touch = latestEvent?.let {
-            Offset(
-                x = when (it.swipeEdge) {
-                    NavigationEvent.EDGE_RIGHT -> Float.POSITIVE_INFINITY
-                    else -> 0f
-                },
-                y = startTouchY.value ?: it.touchY
-            )
-        } ?: Offset.Zero,
-        swipeEdge = latestEvent?.swipeEdge ?: NavigationEvent.EDGE_NONE
+        touch = lastTouch.value,
+        swipeEdge = lastSwipeEdge.intValue
     )
 }
 
@@ -188,7 +251,18 @@ private fun PredictiveBackShaderLayer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shader = remember { RuntimeShader(predictiveBackAlphaCircleShader) }
+    val shader = remember {
+        Shader(predictiveBackAlphaCircleShader).getRuntimeShader(
+            uniforms = listOf(
+                Uniform(Uniform.Type.SHADER, "image"),
+                Uniform(Uniform.Type.VEC2, "resolution"),
+                Uniform(Uniform.Type.VEC2, "touch"),
+                Uniform(Uniform.Type.FLOAT, "progress"),
+                Uniform(Uniform.Type.FLOAT, "edge")
+            ),
+            customFunctions = setOf(ShaderFunction.CUBICOUT)
+        )
+    }
 
     Box(
         modifier = modifier.graphicsLayer {
@@ -212,27 +286,32 @@ private fun PredictiveBackShaderLayer(
 }
 
 private val predictiveBackAlphaCircleShader = """
-    uniform shader image;
-    uniform float2 resolution;
-    uniform float2 touch;
-    uniform float progress;
-    uniform float edge;
-
     half4 main(float2 fragCoord) {
         half4 color = image.eval(fragCoord);
         float minResolution = min(resolution.x, resolution.y);
         float2 uv = (fragCoord - touch) / minResolution;
+        float easedProgress = CubicOut(progress);
 
         float distanceFromTouch = length(uv);
-        float radius = progress * 1.35;
-        float feather = mix(0.04, 0.16, progress);
+        float radius = easedProgress * 1.85;
+        float feather = mix(0.04, 0.16, easedProgress);
         float circle = 1.0 - smoothstep(radius - feather, radius, distanceFromTouch);
-        float alphaCut = circle * smoothstep(0.0, 0.95, progress);
+        float alphaCut = circle * smoothstep(0.0, 0.95, easedProgress);
         float alpha = 1.0 - alphaCut;
 
         return half4(color.rgb * alpha, color.a * alpha);
     }
 """.trimIndent()
+
+private const val BACK_COMPLETE_DURATION_MS = 180
+private const val BACK_CANCEL_DURATION_MS = 140
+private const val BACK_COMPLETE_PROGRESS = 1.15f
+private const val BACK_POP_DELAY_MS = 32L
+private const val BACK_RESET_FRAME_DELAY = 5
+private val noNavDisplayTransition = ContentTransform(
+    targetContentEnter = EnterTransition.None,
+    initialContentExit = ExitTransition.None
+)
 
 val effects = listOf(
     EffectScreenData(
