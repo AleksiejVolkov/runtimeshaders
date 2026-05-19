@@ -4,10 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
 import androidx.compose.material3.Scaffold
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.NavigationEvent
 import com.offmind.runtimeshaders.navigation.Route
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.EffectScreenData
@@ -21,45 +25,59 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val navController = rememberNavController()
+            val backStack = rememberNavBackStack(Route.EffectsList)
             RuntimeShadersTheme {
                 Scaffold { paddingValues ->
-
-                    NavHost(navController, startDestination = Route.EffectsList) {
-                        composable<Route.EffectsList> {
-                            AllEffectsListScreen(
-                                effects = effects,
-                                navController = navController
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = { backStack.removeLastOrNull() },
+                        predictivePopTransitionSpec = { swipeEdge ->
+                            ContentTransform(
+                                targetContentEnter = EnterTransition.None,
+                                initialContentExit = slideOutOfContainer(
+                                    towards = when (swipeEdge) {
+                                        NavigationEvent.EDGE_RIGHT -> SlideDirection.Left
+                                        else -> SlideDirection.Right
+                                    }
+                                )
                             )
+                        },
+                        entryProvider = entryProvider {
+                            entry<Route.EffectsList> {
+                                AllEffectsListScreen(
+                                    effects = effects,
+                                    onEffectSelected = { backStack.add(it) }
+                                )
+                            }
+                            entry<Route.LampShadow> {
+                                LampWithShadowScreen()
+                            }
+                            entry<Route.Waveshock> {
+                                WaveshockOnTapScreen()
+                            }
+                            entry<Route.SnowedDialog> {
+                                SnowDialogScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.TestShader> {
+                                TestShaderScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.TapePlaneTest> {
+                                TapePlaneTestScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.CircleTimer> {
+                                TimerShaderScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.CanvasDeform> {
+                                CanvasDeformScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.Metaballs> {
+                                MetaballsShaderScreen(paddingValues = paddingValues)
+                            }
+                            entry<Route.ColorfulToggle> {
+                                ColorfulToggleScreen(paddingValues = paddingValues)
+                            }
                         }
-                        composable<Route.LampShadow> {
-                            LampWithShadowScreen()
-                        }
-                        composable<Route.Waveshock> {
-                            WaveshockOnTapScreen()
-                        }
-                        composable<Route.SnowedDialog> {
-                            SnowDialogScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.TestShader> {
-                            TestShaderScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.TapePlaneTest> {
-                            TapePlaneTestScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.CircleTimer> {
-                            TimerShaderScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.CanvasDeform> {
-                            CanvasDeformScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.Metaballs> {
-                            MetaballsShaderScreen(paddingValues = paddingValues)
-                        }
-                        composable<Route.ColorfulToggle> {
-                            ColorfulToggleScreen(paddingValues = paddingValues)
-                        }
-                    }
+                    )
                 }
             }
         }

@@ -1,8 +1,9 @@
 package com.offmind.runtimeshaders.navigation
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-sealed class Route {
+sealed class Route : NavKey {
     @Serializable
     class LampShadow(val title: String, val description: String) : Route()
 

@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.offmind.runtimeshaders"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.offmind.runtimeshaders"
@@ -55,7 +55,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation("androidx.navigation3:navigation3-runtime:1.0.1")
+    implementation(libs.navigation3.ui)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
@@ -69,7 +70,6 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
-    implementation(libs.koin.androidx.navigation)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.content.negotiation)
