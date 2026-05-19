@@ -260,7 +260,10 @@ private fun PredictiveBackShaderLayer(
                 Uniform(Uniform.Type.FLOAT, "progress"),
                 Uniform(Uniform.Type.FLOAT, "edge")
             ),
-            customFunctions = setOf(ShaderFunction.CUBICOUT)
+            customFunctions = setOf(
+                ShaderFunction.CUBICOUT,
+                ShaderFunction.HASH21
+            )
         )
     }
 
@@ -295,7 +298,12 @@ private val predictiveBackAlphaCircleShader = """
         float distanceFromTouch = length(uv);
         float radius = easedProgress * 1.85;
         float feather = mix(0.04, 0.16, easedProgress);
-        float circle = 1.0 - smoothstep(radius - feather, radius, distanceFromTouch);
+        float circleCore = 1.0 - smoothstep(radius - feather, radius, distanceFromTouch);
+        float edgeBand = smoothstep(radius - feather * 1.4, radius - feather * 0.2, distanceFromTouch)
+            * (1.0 - smoothstep(radius - feather * 0.15, radius + feather * 0.9, distanceFromTouch));
+        vec2 particleCell = floor((fragCoord - touch) / max(3.0, minResolution * 0.008));
+        float particle = step(0.40 + edgeBand * 0.32, Hash21(particleCell));
+        float circle = mix(circleCore, circleCore * particle, edgeBand);
         float alphaCut = circle * smoothstep(0.0, 0.95, easedProgress);
         float alpha = 1.0 - alphaCut;
 
