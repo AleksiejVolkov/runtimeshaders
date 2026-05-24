@@ -1,8 +1,9 @@
 package com.offmind.runtimeshaders.navigation
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-sealed class Route {
+sealed class Route : NavKey {
     @Serializable
     class LampShadow(val title: String, val description: String) : Route()
 
@@ -32,4 +33,10 @@ sealed class Route {
 
     @Serializable
     data class ColorfulToggle(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NavigationTest(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NavigationTestFeed(val title: String, val description: String) : Route()
 }

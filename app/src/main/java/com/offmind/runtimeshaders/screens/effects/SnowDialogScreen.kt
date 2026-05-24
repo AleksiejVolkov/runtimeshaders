@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,13 +40,12 @@ import org.intellij.lang.annotations.Language
 import java.util.concurrent.atomic.AtomicInteger
 
 @Composable
-fun SnowDialogScreen(paddingValues: PaddingValues) {
+fun SnowDialogScreen() {
     var showDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -64,7 +62,7 @@ fun SnowDialogScreen(paddingValues: PaddingValues) {
                 Text("Ho-ho-ho!")
             }
         } else {
-            SnowedDialog(paddingValues = paddingValues) {
+            SnowedDialog {
                 showDialog = false
             }
         }
@@ -73,7 +71,6 @@ fun SnowDialogScreen(paddingValues: PaddingValues) {
 
 @Composable
 private fun SnowedDialog(
-    paddingValues: PaddingValues,
     onDismiss: () -> Unit
 ) {
     val dialogSnowShader = remember {
@@ -318,4 +315,3 @@ val snowShader = """
        return vec4(finalColor, alpha+image.a);
    }
 """.trimIndent()
-

@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -27,7 +28,7 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun TimerShaderScreen(paddingValues: PaddingValues) {
+fun TimerShaderScreen() {
     var startValue by remember { mutableStateOf(20) }
     var percentage by remember { mutableFloatStateOf(0.0f) }
     var isRunning by remember { mutableStateOf(false) }
@@ -60,7 +61,11 @@ fun TimerShaderScreen(paddingValues: PaddingValues) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(paddingValues),
+            .background(brush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF130926), Color(0xFF1C234E)),
+                startY = 0f,
+                endY = 1f
+            )),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -213,6 +218,6 @@ private val circularTimerShader = """
         // Final color
         vec4 col = color * combinedMask * waveMask;
         
-        return vec4(col.rgb + grad * 0.1, col.a + length(uv));
+        return vec4(col.rgb * col.a + grad * 0.1, col.a + length(uv));
        }
 """.trimIndent()

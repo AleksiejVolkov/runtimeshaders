@@ -34,7 +34,7 @@ import kotlinx.coroutines.delay
 import org.intellij.lang.annotations.Language
 
 @Composable
-fun MetaballsShaderScreen(paddingValues: PaddingValues) {
+fun MetaballsShaderScreen() {
     var percentage by remember { mutableFloatStateOf(0.0f) }
 
     val shader = remember {
@@ -43,7 +43,6 @@ fun MetaballsShaderScreen(paddingValues: PaddingValues) {
 
     Box(
         modifier = Modifier
-            .padding(paddingValues)
             .fillMaxSize()
             .background(Color(0xFF171717)),
         contentAlignment = Alignment.Center
@@ -381,4 +380,3 @@ private val metaballShader = """
         return vec4(finalCol.rgb*alpha, alpha);
      }
 """.trimIndent()
-

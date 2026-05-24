@@ -8,13 +8,9 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -44,7 +40,7 @@ import com.offmind.runtimeshaders.gl.scene.TapePlaneScene
 import java.util.Locale
 
 @Composable
-fun TapePlaneTestScreen(paddingValues: PaddingValues) {
+fun TapePlaneTestScreen() {
     val tapeGradientStartColor = Color(0xFFE91E63)
     val tapeGradientEndColor = Color(0xFF673AB7)
     val scene = remember {
@@ -53,7 +49,6 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
             gradientEndColor = tapeGradientEndColor.toFloatArray()
         )
     }
-    val navigationBarsPadding = WindowInsets.navigationBars.asPaddingValues()
     var cameraControls by remember { mutableStateOf(scene.cameraControls()) }
     var curvePointControls by remember { mutableStateOf(scene.curvePointControls()) }
     var sliderValue by remember { mutableStateOf(0f) }
@@ -85,8 +80,7 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
                         Color(0xFF111820)
                     )
                 )
-            )
-            .padding(paddingValues),
+            ),
         surfaceAlignment = Alignment.Center,
         surfaceModifier = Modifier.size(width = 340.dp, height = 180.dp),
         captureVersion = (sliderValue * 1000).toLong()
@@ -147,7 +141,7 @@ fun TapePlaneTestScreen(paddingValues: PaddingValues) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = navigationBarsPadding.calculateBottomPadding() + 22.dp),
+                    .padding(bottom = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {

@@ -33,14 +33,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.offmind.runtimeshaders.R
 import com.offmind.runtimeshaders.navigation.Route
 
 @Composable
 fun AllEffectsListScreen(
     effects: List<EffectScreenData>,
-    navController: NavController
+    onEffectSelected: (Route) -> Unit
 ) {
     val systemInsets = WindowInsets.systemBars.asPaddingValues()
 
@@ -75,7 +74,7 @@ fun AllEffectsListScreen(
                 EffectListItem(
                     effect = effect,
                     index = index + 1,
-                    onEffectSelected = { navController.navigate(it) }
+                    onEffectSelected = onEffectSelected
                 )
             }
         }

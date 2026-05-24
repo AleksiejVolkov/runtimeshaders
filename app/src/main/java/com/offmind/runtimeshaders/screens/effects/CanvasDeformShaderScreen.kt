@@ -36,7 +36,7 @@ val ElasticOutEasing = Easing { t ->
 }
 
 @Composable
-fun CanvasDeformScreen(paddingValues: PaddingValues) {
+fun CanvasDeformScreen() {
     val shader = remember { RuntimeShader(runtimeShader) }
     var targetPercentage by remember { mutableFloatStateOf(0f) }
     val percentage = animateFloatAsState(targetValue = targetPercentage, animationSpec = tween(durationMillis = 1000, easing = ElasticOutEasing))
@@ -46,7 +46,9 @@ fun CanvasDeformScreen(paddingValues: PaddingValues) {
     val actions = listOf("Cut", "Copy", "Paste", "Edit")
     val pressed = remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = Modifier.fillMaxSize().background(
+        Color(0xFF17161A)
+    ), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier
