@@ -65,12 +65,16 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                     var gestureSession by remember { mutableIntStateOf(0) }
+                    var activeUnderlayRoute by remember { mutableStateOf<Route?>(null) }
                     val terminalProgress = remember { Animatable(0f) }
                     val scope = rememberCoroutineScope()
                     val gestureShaderState = backEventState.toShaderState(resetToken = gestureSession)
 
                     LaunchedEffect(gestureShaderState.progress) {
                         if (gestureShaderState.progress > 0f) {
+                            if (activeUnderlayRoute == null) {
+                                activeUnderlayRoute = backStack.dropLast(1).lastOrNull() as? Route
+                            }
                             terminalProgress.snapTo(gestureShaderState.progress)
                         }
                     }
@@ -81,7 +85,7 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         val underlayRoute = if (shaderState.progress > 0f) {
-                            (backStack.dropLast(1).lastOrNull() ?: backStack.lastOrNull()) as? Route
+                            activeUnderlayRoute ?: backStack.dropLast(1).lastOrNull() as? Route
                         } else {
                             null
                         }
@@ -136,6 +140,12 @@ class MainActivity : ComponentActivity() {
                                     entry<Route.ColorfulToggle> { route ->
                                         RouteContent(route, { backStack.add(it) })
                                     }
+                                    entry<Route.NavigationTest> { route ->
+                                        RouteContent(route, { backStack.add(it) })
+                                    }
+                                    entry<Route.NavigationTestFeed> { route ->
+                                        RouteContent(route, { backStack.add(it) })
+                                    }
                                 }
                             )
                         }
@@ -150,6 +160,7 @@ class MainActivity : ComponentActivity() {
                                     targetValue = 0f,
                                     animationSpec = tween(durationMillis = BACK_CANCEL_DURATION_MS)
                                 )
+                                activeUnderlayRoute = null
                                 gestureSession++
                             }
                         },
@@ -165,6 +176,7 @@ class MainActivity : ComponentActivity() {
                                     withFrameNanos { }
                                 }
                                 terminalProgress.snapTo(0f)
+                                activeUnderlayRoute = null
                                 gestureSession++
                             }
                         }
@@ -195,6 +207,17 @@ private fun RouteContent(
         is Route.CanvasDeform -> CanvasDeformScreen()
         is Route.Metaballs -> MetaballsShaderScreen()
         is Route.ColorfulToggle -> ColorfulToggleScreen()
+        is Route.NavigationTest -> NavigationTestScreen(
+            onLogin = {
+                onEffectSelected(
+                    Route.NavigationTestFeed(
+                        "Navigation Test Feed",
+                        "Mock feed"
+                    )
+                )
+            }
+        )
+        is Route.NavigationTestFeed -> NavigationTestFeedScreen()
     }
 }
 
@@ -249,7 +272,7 @@ private fun PredictiveBackShaderLayer(
     content: @Composable () -> Unit
 ) {
     val shader = remember {
-        Shader(predictiveBackAlphaCircleShader).getRuntimeShader(
+        Shader(predictiveBackHumpMaskShader).getRuntimeShader(
             uniforms = listOf(
                 Uniform(Uniform.Type.SHADER, "image"),
                 Uniform(Uniform.Type.VEC2, "resolution"),
@@ -325,32 +348,48 @@ private val predictiveBackHumpMaskShader = """
         float verticalProfile = 1.0 - smoothstep(0.0, verticalRange, verticalDistance);
         verticalProfile = pow(verticalProfile, verticalPower);
 
-        float maxReach = resolution.x * mix(0.68, 1.45, completion) * easedProgress;
+        float maxReach = resolution.x * mix(0.34, 1.45, completion) * easedProgress;
         float waveFront = maxReach * verticalProfile;
-        float alphaFeather = mix(6.0, 18.0, easedProgress);
-        float deformationFeather = mix(18.0, 72.0, easedProgress);
+        float alphaFeather = mix(2.5, 7.0, easedProgress);
         float mask = 1.0 - smoothstep(waveFront - alphaFeather, waveFront + alphaFeather, fromEdge);
         mask *= smoothstep(0.0, 0.08, easedProgress);
 
-        float frontBand = 1.0 - smoothstep(0.0, deformationFeather * 4.2, abs(fromEdge - waveFront));
-        float pull = frontBand * verticalProfile * easedProgress;
-        float direction = sign(waveFront - fromEdge);
+        float2 anchor = vec2(
+            edge < 0.5 ? waveFront : resolution.x - waveFront,
+            touch.y
+        );
+        float2 toAnchor = anchor - fragCoord;
+        float2 normalizedToAnchor = vec2(
+            toAnchor.x / resolution.x,
+            toAnchor.y / resolution.y
+        );
+        float pullDistance = length(normalizedToAnchor);
+        float pullInfluence = 1.0 - smoothstep(0.0, mix(0.55, 1.15, completion), pullDistance);
+        pullInfluence *= smoothstep(0.0, 0.12, easedProgress);
+        pullInfluence *= edge < 0.5
+            ? 1.0 - smoothstep(anchor.x, resolution.x, fragCoord.x)
+            : smoothstep(0.0, anchor.x, fragCoord.x);
+        float pullStrength = mix(0.18, 0.55, completion) * easedProgress * pullInfluence;
         float2 sampleCoord = fragCoord;
-        sampleCoord.x -= edgeSign * direction * pull * resolution.x * 0.16;
-        sampleCoord.y -= sign(fragCoord.y - touch.y) * pull * resolution.y * 0.045;
+        sampleCoord -= toAnchor * pullStrength;
         sampleCoord = clamp(sampleCoord, vec2(0.0), resolution);
 
         half4 warpedColor = image.eval(sampleCoord);
         float alpha = 1.0 - mask;
+        float shadowDistance = waveFront - fromEdge;
+        float shadowBand = 1.0 - smoothstep(-alphaFeather * 2.0, alphaFeather * 22.0, shadowDistance);
+        float softShadow = shadowBand * shadowBand * (3.0 - 2.0 * shadowBand);
+        float shadow = softShadow * mask * (1.0 - completion) * 0.16;
+        float finalAlpha = max(warpedColor.a * alpha, shadow);
 
-        return half4(warpedColor.rgb * alpha, warpedColor.a * alpha);
+        return half4(warpedColor.rgb * alpha, finalAlpha);
     }
 """.trimIndent()
 
 private const val BACK_COMPLETE_DURATION_MS = 260
 private const val BACK_CANCEL_DURATION_MS = 140
 private const val BACK_COMPLETE_PROGRESS = 1.7f
-private const val BACK_POP_DELAY_MS = 32L
+private const val BACK_POP_DELAY_MS = 128L
 private const val BACK_RESET_FRAME_DELAY = 5
 private val noNavDisplayTransition = ContentTransform(
     targetContentEnter = EnterTransition.None,
@@ -428,6 +467,14 @@ val effects = listOf(
         screenRoute = Route.ColorfulToggle(
             "Colorful Toggle",
             ""
+        )
+    ),
+    EffectScreenData(
+        title = "Navigation Test",
+        description = "Login to feed mock flow",
+        screenRoute = Route.NavigationTest(
+            "Navigation Test",
+            "Login to feed mock flow"
         )
     )
 )

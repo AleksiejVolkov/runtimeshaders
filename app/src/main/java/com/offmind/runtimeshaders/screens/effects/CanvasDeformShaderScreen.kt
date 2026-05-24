@@ -46,7 +46,9 @@ fun CanvasDeformScreen() {
     val actions = listOf("Cut", "Copy", "Paste", "Edit")
     val pressed = remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = Modifier.fillMaxSize().background(
+        Color(0xFF17161A)
+    ), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier

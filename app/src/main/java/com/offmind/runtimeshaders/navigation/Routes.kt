@@ -33,4 +33,10 @@ sealed class Route : NavKey {
 
     @Serializable
     data class ColorfulToggle(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NavigationTest(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NavigationTestFeed(val title: String, val description: String) : Route()
 }
