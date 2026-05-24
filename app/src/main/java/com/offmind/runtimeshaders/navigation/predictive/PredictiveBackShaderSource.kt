@@ -7,6 +7,7 @@ internal val predictiveBackHumpMaskShader = """
         float easedProgress = mix(CubicOut(clamp(progress, 0.0, 1.0)), 1.65, completion);
         float edgeSign = edge < 0.5 ? 1.0 : -1.0;
         float fromEdge = edge < 0.5 ? fragCoord.x : resolution.x - fragCoord.x;
+        float normalizedFromEdge = fromEdge / resolution.x;
 
         float verticalDistance = abs(fragCoord.y - touch.y) / resolution.y;
         float verticalRange = mix(0.46, 1.35, completion);
@@ -14,30 +15,23 @@ internal val predictiveBackHumpMaskShader = """
         float verticalProfile = 1.0 - smoothstep(0.0, verticalRange, verticalDistance);
         verticalProfile = pow(verticalProfile, verticalPower);
 
-        float maxReach = resolution.x * mix(0.34, 1.45, completion) * easedProgress;
+        float maxReach = resolution.x * mix(0.31, 1.45, completion) * easedProgress;
         float waveFront = maxReach * verticalProfile;
         float alphaFeather = mix(2.5, 7.0, easedProgress);
         float mask = 1.0 - smoothstep(waveFront - alphaFeather, waveFront + alphaFeather, fromEdge);
         mask *= smoothstep(0.0, 0.08, easedProgress);
 
-        float2 anchor = vec2(
-            edge < 0.5 ? waveFront : resolution.x - waveFront,
-            touch.y
-        );
-        float2 toAnchor = anchor - fragCoord;
-        float2 normalizedToAnchor = vec2(
-            toAnchor.x / resolution.x,
-            toAnchor.y / resolution.y
-        );
-        float pullDistance = length(normalizedToAnchor);
-        float pullInfluence = 1.0 - smoothstep(0.0, mix(0.55, 1.15, completion), pullDistance);
-        pullInfluence *= smoothstep(0.0, 0.12, easedProgress);
-        pullInfluence *= edge < 0.5
-            ? 1.0 - smoothstep(anchor.x, resolution.x, fragCoord.x)
-            : smoothstep(0.0, anchor.x, fragCoord.x);
-        float pullStrength = mix(0.18, 0.55, completion) * easedProgress * pullInfluence;
         float2 sampleCoord = fragCoord;
-        sampleCoord -= toAnchor * pullStrength;
+        float edgeInfluence = 1.0 - smoothstep(0.02, mix(0.82, 1.0, completion), normalizedFromEdge);
+        edgeInfluence = pow(edgeInfluence, mix(1.55, 0.72, completion));
+        float waist = verticalProfile * smoothstep(0.0, 0.14, easedProgress);
+        float horizontalWarp = waveFront * edgeInfluence * mix(0.62, 0.18, completion);
+        sampleCoord.x -= edgeSign * horizontalWarp;
+
+        float verticalDirection = sign(fragCoord.y - touch.y);
+        float verticalRelaxation = (1.0 - verticalProfile) * waist * edgeInfluence;
+        verticalRelaxation *= resolution.y * mix(0.018, 0.006, completion) * easedProgress;
+        sampleCoord.y -= verticalDirection * verticalRelaxation;
         sampleCoord = clamp(sampleCoord, vec2(0.0), resolution);
 
         half4 warpedColor = image.eval(sampleCoord);
