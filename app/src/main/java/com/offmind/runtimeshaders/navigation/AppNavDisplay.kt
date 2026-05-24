@@ -50,7 +50,7 @@ internal fun PredictiveBackNavDisplay(
 
 private fun routeEntryProvider(
     onEffectSelected: (Route) -> Unit
-) = entryProvider<NavKey> {
+) = entryProvider {
     routeContentEntry<Route.EffectsList>(onEffectSelected)
     routeContentEntry<Route.LampShadow>(onEffectSelected)
     routeContentEntry<Route.Waveshock>(onEffectSelected)

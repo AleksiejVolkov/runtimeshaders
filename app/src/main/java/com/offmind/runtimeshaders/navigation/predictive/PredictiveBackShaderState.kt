@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.navigationevent.NavigationEvent
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.NavigationEventTransitionState
+import androidx.navigationevent.compose.NavigationEventState
 
 data class PredictiveBackShaderState internal constructor(
     val progress: Float,
@@ -17,7 +18,7 @@ data class PredictiveBackShaderState internal constructor(
 )
 
 @Composable
-internal fun androidx.navigationevent.compose.NavigationEventState<NavigationEventInfo.None>.toShaderState(
+internal fun NavigationEventState<NavigationEventInfo.None>.toShaderState(
     resetToken: Int
 ): PredictiveBackShaderState {
     val transitionState = transitionState

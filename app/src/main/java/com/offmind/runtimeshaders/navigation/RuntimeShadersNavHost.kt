@@ -26,6 +26,7 @@ import com.offmind.runtimeshaders.navigation.predictive.BACK_RESET_FRAME_DELAY
 import com.offmind.runtimeshaders.navigation.predictive.toShaderState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 internal fun RuntimeShadersNavHost() {
@@ -99,7 +100,7 @@ internal fun RuntimeShadersNavHost() {
                         targetValue = BACK_COMPLETE_PROGRESS,
                         animationSpec = tween(durationMillis = BACK_COMPLETE_DURATION_MS)
                     )
-                    delay(BACK_POP_DELAY_MS)
+                    delay(BACK_POP_DELAY_MS.milliseconds)
                     backStack.removeLastOrNull()
                     repeat(BACK_RESET_FRAME_DELAY) {
                         withFrameNanos { }

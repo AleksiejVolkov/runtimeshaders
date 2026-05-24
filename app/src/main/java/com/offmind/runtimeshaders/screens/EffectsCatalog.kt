@@ -28,8 +28,8 @@ internal val effectsCatalog = listOf(
         )
     ),
     EffectScreenData(
-        title = "Test shader",
-        description = "Shader for tests",
+        title = "OpenGL glass",
+        description = "OpenGL Cube with glass effect",
         screenRoute = Route.TestShader(
             "Test Shader",
             "Shader for tests"
