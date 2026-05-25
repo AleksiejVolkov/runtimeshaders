@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,7 +45,7 @@ import androidx.compose.ui.unit.dp
 fun NavigationTestScreen(onLogin: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF7F8FA)
+        color = Color(0xFFF5F5F5)
     ) {
         LoginScreen(onLogin = onLogin)
     }
@@ -52,9 +53,10 @@ fun NavigationTestScreen(onLogin: () -> Unit) {
 
 @Composable
 fun NavigationTestFeedScreen() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF7F8FA)
+    Box(
+        modifier = Modifier.fillMaxSize().background(brush = Brush.verticalGradient(
+              colors = listOf(Color(0xFFE8EDFF), Color(0xFFBFC1C9))
+        )),
     ) {
         FeedScreen()
     }

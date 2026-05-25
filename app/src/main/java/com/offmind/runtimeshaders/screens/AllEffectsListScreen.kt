@@ -21,7 +21,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,7 +41,8 @@ import com.offmind.runtimeshaders.navigation.Route
 @Composable
 fun AllEffectsListScreen(
     effects: List<EffectScreenData>,
-    onEffectSelected: (Route) -> Unit
+    onEffectSelected: (Route) -> Unit,
+    onSettingsSelected: () -> Unit
 ) {
     val systemInsets = WindowInsets.systemBars.asPaddingValues()
 
@@ -65,7 +68,7 @@ fun AllEffectsListScreen(
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = systemInsets.calculateTopPadding() + 12.dp,
+                top = systemInsets.calculateTopPadding() + 56.dp,
                 bottom = systemInsets.calculateBottomPadding() + 12.dp
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -75,6 +78,23 @@ fun AllEffectsListScreen(
                     effect = effect,
                     index = index + 1,
                     onEffectSelected = onEffectSelected
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(
+                    top = systemInsets.calculateTopPadding() + 8.dp,
+                    end = 8.dp
+                ),
+            horizontalArrangement = Arrangement.End
+        ) {
+            IconButton(onClick = onSettingsSelected) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "Settings",
+                    tint = Color.White
                 )
             }
         }

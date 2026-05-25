@@ -23,6 +23,12 @@ sealed class Route : NavKey {
     data object EffectsList : Route()
 
     @Serializable
+    data object Settings : Route()
+
+    @Serializable
+    data object BackEffectPicker : Route()
+
+    @Serializable
     data class SnowedDialog(val title: String, val description: String) : Route()
 
     @Serializable

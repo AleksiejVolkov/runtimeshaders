@@ -3,7 +3,12 @@ package com.offmind.runtimeshaders.navigation.predictive
 import android.graphics.RenderEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asComposeRenderEffect
@@ -15,23 +20,36 @@ import com.offmind.runtimeshaders.shaders.Uniform
 @Composable
 internal fun PredictiveBackShaderLayer(
     state: PredictiveBackShaderState,
+    effect: PredictiveBackEffect,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shader = remember {
-        Shader(predictiveBackHumpMaskShader).getRuntimeShader(
+    val shader = remember(effect) {
+        Shader(effect.shaderSource).getRuntimeShader(
             uniforms = listOf(
                 Uniform(Uniform.Type.SHADER, "image"),
                 Uniform(Uniform.Type.VEC2, "resolution"),
                 Uniform(Uniform.Type.VEC2, "touch"),
                 Uniform(Uniform.Type.FLOAT, "progress"),
-                Uniform(Uniform.Type.FLOAT, "edge")
+                Uniform(Uniform.Type.FLOAT, "edge"),
+                Uniform(Uniform.Type.FLOAT, "time")
             ),
             customFunctions = setOf(
                 ShaderFunction.CUBICOUT,
                 ShaderFunction.HASH21
             )
         )
+    }
+    var frameTimeNanos by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(state.progress > 0f) {
+        if (state.progress > 0f) {
+            while (true) {
+                frameTimeNanos = withFrameNanos { it }
+            }
+        } else {
+            frameTimeNanos = 0L
+        }
     }
 
     Box(
@@ -45,6 +63,7 @@ internal fun PredictiveBackShaderLayer(
                 shader.setFloatUniform("touch", centerX, state.touch.y)
                 shader.setFloatUniform("progress", state.progress)
                 shader.setFloatUniform("edge", state.swipeEdge.toFloat())
+                shader.setFloatUniform("time", frameTimeNanos / 1_000_000_000f)
                 renderEffect = RenderEffect
                     .createRuntimeShaderEffect(shader, "image")
                     .asComposeRenderEffect()

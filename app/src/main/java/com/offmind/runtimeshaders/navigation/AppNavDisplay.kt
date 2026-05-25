@@ -11,8 +11,11 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackShaderLayer
+import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackEffect
 import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackShaderState
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
+import com.offmind.runtimeshaders.screens.BackEffectPickerScreen
+import com.offmind.runtimeshaders.screens.SettingsScreen
 import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
 import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
 import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
@@ -26,16 +29,35 @@ import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effectsCatalog
 
+internal data class RouteCallbacks(
+    val onEffectSelected: (Route) -> Unit,
+    val onSettingsSelected: () -> Unit,
+    val onChooseBackEffect: () -> Unit,
+    val onBack: () -> Unit,
+    val onBackEffectSelected: (PredictiveBackEffect) -> Unit,
+    val selectedBackEffect: PredictiveBackEffect
+)
+
 @Composable
 internal fun PredictiveBackNavDisplay(
     state: PredictiveBackShaderState,
+    selectedBackEffect: PredictiveBackEffect,
+    onBackEffectSelected: (PredictiveBackEffect) -> Unit,
     backStack: NavBackStack<NavKey>,
     modifier: Modifier = Modifier
 ) {
-    val onEffectSelected: (Route) -> Unit = { backStack.add(it) }
+    val routeCallbacks = RouteCallbacks(
+        onEffectSelected = { backStack.add(it) },
+        onSettingsSelected = { backStack.add(Route.Settings) },
+        onChooseBackEffect = { backStack.add(Route.BackEffectPicker) },
+        onBack = { backStack.removeLastOrNull() },
+        onBackEffectSelected = onBackEffectSelected,
+        selectedBackEffect = selectedBackEffect
+    )
 
     PredictiveBackShaderLayer(
         state = state,
+        effect = selectedBackEffect,
         modifier = modifier
     ) {
         NavDisplay(
@@ -43,35 +65,35 @@ internal fun PredictiveBackNavDisplay(
             onBack = { backStack.removeLastOrNull() },
             popTransitionSpec = { noNavDisplayTransition },
             predictivePopTransitionSpec = { noNavDisplayTransition },
-            entryProvider = routeEntryProvider(onEffectSelected)
+            entryProvider = routeEntryProvider(routeCallbacks)
         )
     }
 }
 
-private fun routeEntryProvider(
-    onEffectSelected: (Route) -> Unit
-) = entryProvider {
-    routeContentEntry<Route.EffectsList>(onEffectSelected)
-    routeContentEntry<Route.LampShadow>(onEffectSelected)
-    routeContentEntry<Route.Waveshock>(onEffectSelected)
-    routeContentEntry<Route.SnowedDialog>(onEffectSelected)
-    routeContentEntry<Route.TestShader>(onEffectSelected)
-    routeContentEntry<Route.TapePlaneTest>(onEffectSelected)
-    routeContentEntry<Route.CircleTimer>(onEffectSelected)
-    routeContentEntry<Route.CanvasDeform>(onEffectSelected)
-    routeContentEntry<Route.Metaballs>(onEffectSelected)
-    routeContentEntry<Route.ColorfulToggle>(onEffectSelected)
-    routeContentEntry<Route.NavigationTest>(onEffectSelected)
-    routeContentEntry<Route.NavigationTestFeed>(onEffectSelected)
+private fun routeEntryProvider(callbacks: RouteCallbacks) = entryProvider {
+    routeContentEntry<Route.EffectsList>(callbacks)
+    routeContentEntry<Route.Settings>(callbacks)
+    routeContentEntry<Route.BackEffectPicker>(callbacks)
+    routeContentEntry<Route.LampShadow>(callbacks)
+    routeContentEntry<Route.Waveshock>(callbacks)
+    routeContentEntry<Route.SnowedDialog>(callbacks)
+    routeContentEntry<Route.TestShader>(callbacks)
+    routeContentEntry<Route.TapePlaneTest>(callbacks)
+    routeContentEntry<Route.CircleTimer>(callbacks)
+    routeContentEntry<Route.CanvasDeform>(callbacks)
+    routeContentEntry<Route.Metaballs>(callbacks)
+    routeContentEntry<Route.ColorfulToggle>(callbacks)
+    routeContentEntry<Route.NavigationTest>(callbacks)
+    routeContentEntry<Route.NavigationTestFeed>(callbacks)
 }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
-    noinline onEffectSelected: (Route) -> Unit
+    callbacks: RouteCallbacks
 ) {
     entry<T> { route ->
         RouteContent(
             route = route,
-            onEffectSelected = onEffectSelected
+            callbacks = callbacks
         )
     }
 }
@@ -79,12 +101,24 @@ private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEn
 @Composable
 internal fun RouteContent(
     route: Route,
-    onEffectSelected: (Route) -> Unit
+    callbacks: RouteCallbacks
 ) {
     when (route) {
         is Route.EffectsList -> AllEffectsListScreen(
             effects = effectsCatalog,
-            onEffectSelected = onEffectSelected
+            onEffectSelected = callbacks.onEffectSelected,
+            onSettingsSelected = callbacks.onSettingsSelected
+        )
+
+        is Route.Settings -> SettingsScreen(
+            onBack = callbacks.onBack,
+            onChooseBackEffect = callbacks.onChooseBackEffect
+        )
+
+        is Route.BackEffectPicker -> BackEffectPickerScreen(
+            selectedEffect = callbacks.selectedBackEffect,
+            onBack = callbacks.onBack,
+            onEffectSelected = callbacks.onBackEffectSelected
         )
 
         is Route.LampShadow -> LampWithShadowScreen()
@@ -98,7 +132,7 @@ internal fun RouteContent(
         is Route.ColorfulToggle -> ColorfulToggleScreen()
         is Route.NavigationTest -> NavigationTestScreen(
             onLogin = {
-                onEffectSelected(
+                callbacks.onEffectSelected(
                     Route.NavigationTestFeed(
                         "Navigation Test Feed",
                         "Mock feed"
