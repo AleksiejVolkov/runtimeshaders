@@ -17,6 +17,12 @@ internal enum class PredictiveBackEffect(
         title = "Particle dissolve",
         description = "Center-out particle dissolve with subtle motion.",
         shaderSource = predictiveBackParticleDissolveShader
+    ),
+    LiquidDrain(
+        id = "liquid_drain",
+        title = "Liquid drain",
+        description = "Current screen softens and drains downward like liquid.",
+        shaderSource = predictiveBackLiquidDrainShader
     );
 
     companion object {
