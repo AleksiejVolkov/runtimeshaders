@@ -1,4 +1,4 @@
-package com.offmind.runtimeshaders.navigation
+gitpackage com.offmind.runtimeshaders.navigation
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition

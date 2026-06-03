@@ -1,68 +1,104 @@
-# Shader Experiments Repository
-Welcome to the Shader Experiments Repository! This repository is dedicated to various shader experiments, with each experiment hosted in its own branch. The main branch contains only the basic initial setup, serving as the foundation for all shader experiments.
+# Runtime Shaders
 
-## Structure
-*main*: The main branch contains the very basic initial setup. It serves as the foundation for all shader experiments. You can use this setup to start your own experiments or to explore the different branches.
+Android shader playground for AGSL runtime shader effects, Compose examples, OpenGL scenes, and predictive-back shader transitions.
 
-*Experiment Branches*: Each shader experiment is contained within its own branch. This structure allows for isolated development and testing of individual shader effects.
+## Project Map
 
-## How to Use
+- `app/src/main/java/com/offmind/runtimeshaders/screens/effects/` contains the example effect screens.
+- `app/src/main/java/com/offmind/runtimeshaders/screens/EffectsCatalog.kt` controls what appears in the effects list.
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/Routes.kt` defines Navigation 3 route keys.
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/AppNavDisplay.kt` maps routes to composable screens.
+- `app/src/main/java/com/offmind/runtimeshaders/shaders/Shader.kt` wraps AGSL code, declares uniforms, and injects generated helper functions.
+- `app/src/main/java/com/offmind/runtimeshaders/shaders/ShadersCollection.kt` stores shared AGSL effect snippets used by several screens.
+- `app/src/main/java/com/offmind/runtimeshaders/composables/Uitls.kt` contains `ShadedBox`, `provideTimeAsState`, and shader uniform application helpers.
+- `buildSrc/src/main/java/com/offmind/runtimeshaders/functions/` contains reusable AGSL helper functions such as noise, SDF, easing, color correction, and transformations.
+- `buildSrc/src/main/java/com/offmind/runtimeshaders/scripts/` generates the shader dependency map used by `Shader`.
+- `app/src/main/java/com/offmind/runtimeshaders/gl/` contains OpenGL renderer, scene, geometry, and GL shader support.
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/` contains predictive-back shader effects and state.
 
-### Cloning the Repository
-To clone the repository, use the following command:
+## Shared Shader Helpers
 
-```bash
-git clone https://github.com/your-username/shader-experiments.git
-cd shader-experiments
+Most Compose shader screens should use `Shader(...).getRuntimeShader(...)` instead of creating `RuntimeShader` directly. The `Shader` wrapper prepends uniforms and injects reusable AGSL helper functions from the generated `ShaderDependencyMap`.
+
+The generated file is created at build time:
+
+```text
+app/build/generated/src/main/java/com/offmind/runtimeshaders/generated/ShaderDependencyMap.kt
 ```
 
-### Checking Out a Specific Experiment
-To explore a specific shader experiment, you need to check out the corresponding branch. Here’s how you can do it:
+Generation is registered by `registerGenerateShaderFunctionsTask(tasks)` in `app/build.gradle.kts`, and `preBuild` depends on `generateShaderDependencyMap`.
 
-List All Branches: To see all available experiments, list the branches:
+Helper functions live in:
 
-```bash
-git branch -a
-```
-Check Out a Branch: Use the checkout command to switch to the branch containing the shader experiment you’re interested in:
-
-```bash
-git checkout branch-name
-//Replace branch-name with the name of the branch you want to explore.
+```text
+buildSrc/src/main/java/com/offmind/runtimeshaders/functions/
 ```
 
-### Running the Experiments
-Each branch contains specific instructions on how to run the shader experiment. Generally, you will need to open the project in your preferred development environment and run it according to the instructions provided in that branch’s README or documentation file.
+Each function file exports an `all...Functions` map. The generator combines those maps, scans references between functions, and emits both `ShaderFunction` enum values and dependency lists. If a shader calls `FBM`, for example, its dependency on `Noise` and `Hash21` is detected and generated automatically.
 
-### Adding New Shader Experiments
-If you want to add a new shader experiment, follow these steps:
+By default, `Shader.getRuntimeShader()` includes all generated functions. For narrower shader sources, pass a smaller `customFunctions` set.
 
-Create a New Branch: Create a new branch for your experiment from the main branch:
+## Shared Shaded Box
 
-```bash
-git checkout main
-git pull origin main
-git checkout -b my-new-shader-experiment
+Use `ShadedBox` from:
+
+```text
+app/src/main/java/com/offmind/runtimeshaders/composables/Uitls.kt
 ```
 
-Develop Your Shader: Add your shader code and any necessary files to this new branch.
+`ShadedBox` supports two modes:
 
-Commit and Push: Commit your changes and push the branch to the repository:
+- With `content`: applies `RenderEffect.createRuntimeShaderEffect(shader, "image")` to the composable children. The shader must include an `image` shader uniform.
+- Without `content`: draws the shader directly behind the box using Compose canvas.
 
-```bash
-git add .
-git commit -m "Add new shader experiment"
-git push origin my-new-shader-experiment
+`ShadedBox` always updates `resolution` from layout size. Set `includeTime = true` when the shader expects `time` to be advanced automatically. Other uniforms are passed through `shaderUniforms` using `ShaderTypedValue`.
+
+The default uniforms declared by `Shader` are:
+
+```text
+uniform shader image;
+uniform vec2 resolution;
+uniform float time;
+uniform float percentage;
 ```
 
-### Contributing
-Contributions are welcome! If you have a shader experiment you’d like to share, please follow the steps above to create a new branch and submit a pull request.
+Use `basicUniformList.addUniform(...)` and `basicUniformList.removeUniform(...)` for shader-specific uniform lists.
 
-- Fork the repository
-- Create your feature branch (`git checkout -b feature/shader-experiment`)
-- Commit your changes (`git commit -m 'Add some shader experiment'`)
-- Push to the branch (`git push origin feature/shader-experiment`)
-- Open a pull request
+## Adding A New Compose Shader Effect
 
-## License
-This repository is licensed under the MIT License.
+1. Create a screen in `app/src/main/java/com/offmind/runtimeshaders/screens/effects/`.
+2. Put the AGSL source either in that screen for local-only shaders or in `ShadersCollection.kt` if it is shared.
+3. Create the shader with `remember { Shader(source).getRuntimeShader(...) }`.
+4. Use `ShadedBox` to render the shader over content or as a direct shader surface.
+5. Add custom uniforms with `basicUniformList.addUniform(Uniform.Type... to "name")`, then pass runtime values with `shaderUniforms`.
+6. Add a route in `Routes.kt`.
+7. Add the route entry in `routeEntryProvider(...)` and the screen mapping in `RouteContent(...)` in `AppNavDisplay.kt`.
+8. Add a visible item in `EffectsCatalog.kt`.
+9. Build with `./gradlew :app:compileDebugKotlin` or `./gradlew assembleDebug`.
+
+## Adding A New Reusable AGSL Function
+
+1. Add the function string to the closest file in `buildSrc/src/main/java/com/offmind/runtimeshaders/functions/`, or create a new file in that package.
+2. Add the function to that file's `all...Functions` map.
+3. If the new file has a new aggregate map, include it in `allFunctions` inside `createDependencies.kt`.
+4. Run `./gradlew generateShaderDependencyMap` or any normal app build.
+5. Use the function name directly inside shader source. The generated dependency map handles function ordering and dependencies.
+
+Function names should match the AGSL function name exactly in the map key, because the generator uses those keys for dependency scanning and enum generation.
+
+## Build
+
+The project uses Gradle wrapper, Android Gradle Plugin, Kotlin, Compose, and Java 17.
+
+```bash
+./gradlew :app:compileDebugKotlin
+./gradlew assembleDebug
+```
+
+See `BUILD_SETUP.md` for local IDE and Java setup notes.
+
+## Related Docs
+
+- `AGENTS.md` gives coding-agent instructions and a concise project workflow.
+- `SHADER_BOX_USAGE.md` describes basic `ShadedBox` usage.
+- `PREDICTIVE_BACK_SHADER_NAV3_ARTICLE.md` documents the predictive-back shader work.
