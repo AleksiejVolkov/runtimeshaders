@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import com.offmind.runtimeshaders.shaders.ShaderTypedValue
 import kotlinx.coroutines.delay
 import kotlin.collections.toFloatArray
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun provideTimeAsState(initialValue: Float = 0f): State<Float> {
@@ -27,7 +28,7 @@ fun provideTimeAsState(initialValue: Float = 0f): State<Float> {
     LaunchedEffect(Unit) {
         while (true) {
             timeState.floatValue += 0.01f
-            delay(10)
+            delay(10.milliseconds)
         }
     }
 

@@ -76,6 +76,22 @@ internal val effectsCatalog = listOf(
         )
     ),
     EffectScreenData(
+        title = "Dual Light Texture",
+        description = "Pink and blue light shared across UI elements",
+        screenRoute = Route.DualLightTexture(
+            "Dual Light Texture",
+            "Pink and blue light shared across UI elements"
+        )
+    ),
+    EffectScreenData(
+        title = "Illuminate UI",
+        description = "Dashboard UI layout for lighting shader demo",
+        screenRoute = Route.IlluminateUi(
+            "Illuminate UI",
+            "Dashboard UI layout for lighting shader demo"
+        )
+    ),
+    EffectScreenData(
         title = "Navigation Test",
         description = "Login to feed mock flow",
         screenRoute = Route.NavigationTest(

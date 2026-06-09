@@ -1,4 +1,4 @@
-gitpackage com.offmind.runtimeshaders.navigation
+package com.offmind.runtimeshaders.navigation
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -18,6 +18,8 @@ import com.offmind.runtimeshaders.screens.BackEffectPickerScreen
 import com.offmind.runtimeshaders.screens.SettingsScreen
 import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
 import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
+import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
+import com.offmind.runtimeshaders.screens.effects.IlluminateUiScreen
 import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
 import com.offmind.runtimeshaders.screens.effects.MetaballsShaderScreen
 import com.offmind.runtimeshaders.screens.effects.NavigationTestFeedScreen
@@ -83,8 +85,10 @@ private fun routeEntryProvider(callbacks: RouteCallbacks) = entryProvider {
     routeContentEntry<Route.CanvasDeform>(callbacks)
     routeContentEntry<Route.Metaballs>(callbacks)
     routeContentEntry<Route.ColorfulToggle>(callbacks)
+    routeContentEntry<Route.DualLightTexture>(callbacks)
     routeContentEntry<Route.NavigationTest>(callbacks)
     routeContentEntry<Route.NavigationTestFeed>(callbacks)
+    routeContentEntry<Route.IlluminateUi>(callbacks)
 }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
@@ -130,6 +134,7 @@ internal fun RouteContent(
         is Route.CanvasDeform -> CanvasDeformScreen()
         is Route.Metaballs -> MetaballsShaderScreen()
         is Route.ColorfulToggle -> ColorfulToggleScreen()
+        is Route.DualLightTexture -> DualLightTextureScreen()
         is Route.NavigationTest -> NavigationTestScreen(
             onLogin = {
                 callbacks.onEffectSelected(
@@ -141,6 +146,7 @@ internal fun RouteContent(
             }
         )
         is Route.NavigationTestFeed -> NavigationTestFeedScreen()
+        is Route.IlluminateUi -> IlluminateUiScreen()
     }
 }
 
