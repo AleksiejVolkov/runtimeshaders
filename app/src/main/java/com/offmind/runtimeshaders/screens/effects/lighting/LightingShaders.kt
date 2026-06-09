@@ -1,57 +1,38 @@
 package com.offmind.runtimeshaders.screens.effects.lighting
 
 // AGSL allows indexing a uniform array by a for-loop induction variable as long as the
-// loop bound is a compile-time constant. We bake the array sizes (MAX_LIGHTS, …) straight
-// into the shader source, then iterate the whole fixed array and skip empty slots:
-// unused entries are left at 0 by the Kotlin uniform setters, so `intensity <= 0` (lights)
-// and `feather <= 0` (exclusions) act as natural "inactive" sentinels.
+// loop bound is a compile-time constant. We bake the array size (MAX_LIGHTS) straight into
+// the shader source, then iterate the whole fixed array and skip empty slots: unused
+// entries are left at 0 by the Kotlin uniform setters, so `intensity <= 0` acts as a
+// natural "inactive light" sentinel.
 
-internal fun buildGlobalBloomShader(maxLights: Int, maxExclusions: Int): String = """
+internal fun buildGlobalBloomShader(maxLights: Int): String = """
     // scopeOrigin converts scope-local fragCoord to root/window space, matching the
     // coordinate system of lightPositions (stored via boundsInRoot). Without it the
     // bloom center drifts by however far the scope is offset from the window origin.
     uniform vec2 scopeOrigin;
     uniform vec2 lightPositions[$maxLights];
     uniform vec3 lightColors[$maxLights];
-    uniform float bloomRadii[$maxLights];        // halo size only — independent of receiver radius
-    uniform float lightIntensities[$maxLights];
-
-    // Exclusion zones (root space, xy = min corner, zw = max corner) carve the bloom out
-    // of an element's bounds so a co-located light glows from under it instead of over it.
-    uniform vec4 exclusionRects[$maxExclusions];
-    uniform float exclusionFeather[$maxExclusions];
+    uniform float bloomIntensities[$maxLights];  // visible-halo strength per light
 
     vec4 main(float2 fragCoord) {
         vec4 src = image.eval(fragCoord);
         vec2 worldPos = scopeOrigin + fragCoord;
+        // resolution is the scope size, so its length is the same scene diagonal the
+        // receiver shader normalizes by — the halo therefore matches the lit field exactly.
+        float sceneScale = max(length(resolution), 1.0);
 
         vec3 bloom = vec3(0.0);
         for (int i = 0; i < $maxLights; i++) {
-            if (lightIntensities[i] <= 0.0) continue;   // inactive slot
+            if (bloomIntensities[i] <= 0.0) continue;   // inactive slot
 
-            float dist = length(worldPos - lightPositions[i]) / max(bloomRadii[i], 1.0);
-            float falloff = 1.0 / (1.0 + 6.0 * dist * dist * dist);
-            falloff *= smoothstep(2.0, 0.8, dist);
-
-            vec3 hsv = RGBtoHSV(lightColors[i]);
-            hsv.z = 1.0;                                 // vivid, pure-hue halo
-            bloom += HSVtoRGB(hsv) * falloff * lightIntensities[i];
+            // The exact same falloff field the receivers see, painted in the light color.
+            float nd = length(worldPos - lightPositions[i]) / sceneScale;
+            float falloff = exp(-5.0 * nd);
+            bloom += lightColors[i] * falloff * bloomIntensities[i];
         }
 
-        // Exclusion mask: 1.0 everywhere except inside a zone, where a box-SDF ramps it
-        // down to 0.0 over `feather` pixels — a clean rounded falloff at the edges.
-        float mask = 1.0;
-        for (int i = 0; i < $maxExclusions; i++) {
-            if (exclusionFeather[i] <= 0.0) continue;    // inactive slot
-
-            vec2 zoneCenter = (exclusionRects[i].xy + exclusionRects[i].zw) * 0.5;
-            vec2 zoneHalf   = (exclusionRects[i].zw - exclusionRects[i].xy) * 0.5;
-            vec2 q = abs(worldPos - zoneCenter) - zoneHalf;
-            float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
-            mask = min(mask, smoothstep(-exclusionFeather[i], 0.0, sdf));
-        }
-
-        vec3 color = src.rgb + bloom * 0.38 * mask;
+        vec3 color = src.rgb + bloom;
         return vec4(clamp(color, 0.0, 1.0), src.a);
     }
 """.trimIndent()
@@ -59,9 +40,9 @@ internal fun buildGlobalBloomShader(maxLights: Int, maxExclusions: Int): String 
 internal fun buildElementReceiverShader(maxLights: Int): String = """
     uniform vec2 elementOrigin;
     uniform float strength;
+    uniform float sceneScale;       // scene diagonal in px — normalizes distance to 0..~1
     uniform vec2 lightPositions[$maxLights];
     uniform vec3 lightColors[$maxLights];
-    uniform float lightRadii[$maxLights];
     uniform float lightIntensities[$maxLights];
 
     vec4 main(float2 fragCoord) {
@@ -77,9 +58,14 @@ internal fun buildElementReceiverShader(maxLights: Int): String = """
         for (int i = 0; i < $maxLights; i++) {
             if (lightIntensities[i] <= 0.0) continue;   // inactive slot
 
-            float dist = length(worldPos - lightPositions[i]) / max(lightRadii[i], 1.0);
-            float falloff = 1.0 / (1.0 + 6.0 * dist * dist * dist);
-            falloff *= smoothstep(2.0, 0.8, dist);
+            // Distance normalized by the scene size (0 at the light, ~1 across the
+            // screen). Exponential falloff has no flat region near the source, so a
+            // close receiver and a far one read very differently — unlike a polynomial,
+            // which stays near 1.0 for a wide band around the light. The 5.0 is the knob:
+            // larger = tighter pool of light (more near/far contrast), smaller = reaches
+            // farther. intensity then scales overall brightness on top.
+            float nd = length(worldPos - lightPositions[i]) / sceneScale;
+            float falloff = exp(-5.0 * nd);
 
             accumulated += lightColors[i] * falloff * lightIntensities[i];
 

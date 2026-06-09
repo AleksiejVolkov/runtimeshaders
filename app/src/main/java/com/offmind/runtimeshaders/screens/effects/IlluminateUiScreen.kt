@@ -59,7 +59,7 @@ private object Palette {
     val Card = Color(0xFF1A2235)
     val CardActive = Color(0xFF1E1830)
     val Border = Color.White.copy(alpha = 0.10f)
-    val AccentOrange = Color(0xFFE8853A)
+    val AccentOrange = Color(0xFFFF5722)
     val AccentPurple = Color(0xFF8B6FD4)
     val TextPrimary = Color.White
     val TextSecondary = Color.White.copy(alpha = 0.55f)
@@ -67,13 +67,11 @@ private object Palette {
 
 /** Tuning for the two demonstrable light sources on this screen. */
 private object Lighting {
-    val ProjectRadius = 150.dp
-    val ProjectBloom = 100.dp
-    const val ProjectIntensity = 1.5f
+    const val ProjectIntensity = 0.5f
+    const val ProjectBloomIntensity = 0.3f
 
-    val TaskRadius = 400.dp
-    val TaskBloom = 20.dp
-    const val TaskIntensity = 1.2f
+    const val TaskIntensity = 0.25f
+    const val TaskBloomIntensity = 0.1f
 }
 
 private const val ToggleDurationMillis = 600
@@ -116,6 +114,11 @@ fun IlluminateUiScreen() {
         animationSpec = toggleSpec(),
         label = "taskLight",
     )
+    val taskBloom by animateFloatAsState(
+        targetValue = if (tasksEnabled) Lighting.TaskBloomIntensity else 0f,
+        animationSpec = toggleSpec(),
+        label = "taskBloom",
+    )
 
     LightingScope(
         modifier = Modifier
@@ -144,9 +147,8 @@ fun IlluminateUiScreen() {
                 onCheckedChange = { tasksEnabled = it },
                 switchModifier = Modifier.lightSource(
                     color = Palette.AccentPurple,
-                    radius = Lighting.TaskRadius,
-                    bloomRadius = Lighting.TaskBloom,
                     intensity = taskIntensity,
+                    bloomIntensity = taskBloom,
                 ),
             )
 
@@ -218,6 +220,11 @@ private fun LightingScopeReceiver.ProjectCard(
         animationSpec = toggleSpec(),
         label = "projectLight",
     )
+    val bloomIntensity by animateFloatAsState(
+        targetValue = if (enabled) Lighting.ProjectBloomIntensity else 0f,
+        animationSpec = toggleSpec(),
+        label = "projectBloom",
+    )
     val cardBg by animateColorAsState(
         targetValue = if (enabled) Palette.CardActive else Palette.Card,
         animationSpec = toggleSpec(),
@@ -233,7 +240,7 @@ private fun LightingScopeReceiver.ProjectCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .receivesLight(strength = 0.4f)
+            .receivesLight(strength = 1f)
             .background(cardBg)
             .border(1.dp, Palette.Border, RoundedCornerShape(20.dp))
             .padding(18.dp),
@@ -252,7 +259,6 @@ private fun LightingScopeReceiver.ProjectCard(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .excludeLight()
                     .background(Palette.AccentOrange.copy(alpha = iconAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -264,9 +270,8 @@ private fun LightingScopeReceiver.ProjectCard(
                         .size(36.dp)
                         .lightSource(
                             color = Palette.AccentOrange,
-                            radius = 300.dp,
-                            bloomRadius = Lighting.ProjectBloom,
                             intensity = lightIntensity,
+                            bloomIntensity = bloomIntensity,
                         ),
                 )
             }
@@ -333,7 +338,7 @@ private fun LightingScopeReceiver.ActivityRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .receivesLight(strength = 0.6f)
+            .receivesLight(strength = 1f)
             .shadow(elevation = 10.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Palette.Card)

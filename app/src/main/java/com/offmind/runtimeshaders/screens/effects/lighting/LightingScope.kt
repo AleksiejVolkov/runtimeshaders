@@ -20,12 +20,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.toSize
 import com.offmind.runtimeshaders.composables.provideTimeAsState
 import com.offmind.runtimeshaders.shaders.Shader
 import com.offmind.runtimeshaders.shaders.basicUniformList
 import com.offmind.runtimeshaders.shaders.removeUniform
+import kotlin.math.sqrt
 
 /**
  * Establishes a lighting scope. The [content] lambda receives a [LightingScopeReceiver],
@@ -44,7 +44,7 @@ fun LightingScope(
     val state = remember { LightingState() }
     val receiver = remember(state) { LightingScopeReceiverImpl(state) }
     val shader = remember {
-        Shader(buildGlobalBloomShader(MAX_LIGHTS, MAX_EXCLUSIONS)).getRuntimeShader(
+        Shader(buildGlobalBloomShader(MAX_LIGHTS)).getRuntimeShader(
             uniforms = basicUniformList.removeUniform("percentage")
         )
     }
@@ -57,6 +57,7 @@ fun LightingScope(
                 scopeOrigin = coords.positionInRoot()
             }
             .onSizeChanged { size ->
+                state.sceneSize = size.toSize()
                 shader.setFloatUniform(
                     "resolution",
                     size.width.toFloat(),
@@ -65,12 +66,10 @@ fun LightingScope(
             }
             .graphicsLayer {
                 val lights = state.lights          // draw-phase read → layer invalidates on change
-                val exclusions = state.exclusions
                 shader.setFloatUniform("time", time.value)
                 shader.setFloatUniform("scopeOrigin", scopeOrigin.x, scopeOrigin.y)
-                shader.setSharedLightUniforms(lights)
-                shader.setBloomRadii(lights)
-                shader.setExclusionUniforms(exclusions)
+                shader.setLightGeometry(lights)
+                shader.setBloomIntensities(lights)
                 renderEffect = RenderEffect
                     .createRuntimeShaderEffect(shader, "image")
                     .asComposeRenderEffect()
@@ -88,13 +87,9 @@ private class LightingScopeReceiverImpl(
 
     override fun Modifier.lightSource(
         color: Color,
-        radius: Dp,
-        bloomRadius: Dp,
         intensity: Float,
+        bloomIntensity: Float,
     ): Modifier = composed {
-        val density = LocalDensity.current
-        val radiusPx      = with(density) { radius.toPx() }
-        val bloomRadiusPx = with(density) { bloomRadius.toPx() }
         val key = remember { Any() }
         var center by remember { mutableStateOf(Offset.Zero) }
         // Guard against registering at (0,0) before the first layout pass.
@@ -108,8 +103,8 @@ private class LightingScopeReceiverImpl(
         // so intensity changes driven by animateFloatAsState propagate immediately.
         SideEffect {
             if (hasPosition) {
-                if (intensity > 0f) {
-                    state.register(key, LightSource(center, color, radiusPx, bloomRadiusPx, intensity))
+                if (intensity > 0f || bloomIntensity > 0f) {
+                    state.register(key, LightSource(center, color, intensity, bloomIntensity))
                 } else {
                     state.unregister(key)
                 }
@@ -144,36 +139,25 @@ private class LightingScopeReceiverImpl(
             }
             .graphicsLayer {
                 val lights = state.lights
+                val scene = state.sceneSize
+                val sceneScale = sqrt(scene.width * scene.width + scene.height * scene.height)
                 shader.setFloatUniform("time", time.value)
                 shader.setFloatUniform("elementOrigin", origin.x, origin.y)
                 shader.setFloatUniform("strength", strength)
-                shader.setSharedLightUniforms(lights)
-                shader.setReceiverRadii(lights)
+                shader.setFloatUniform("sceneScale", sceneScale.coerceAtLeast(1f))
+                shader.setLightGeometry(lights)
+                shader.setLightIntensities(lights)
                 renderEffect = RenderEffect
                     .createRuntimeShaderEffect(shader, "image")
                     .asComposeRenderEffect()
             }
     }
-
-    override fun Modifier.excludeLight(feather: Dp): Modifier = composed {
-        val featherPx = with(LocalDensity.current) { feather.toPx() }
-        val key = remember { Any() }
-
-        DisposableEffect(key) {
-            onDispose { state.unregisterExclusion(key) }
-        }
-
-        onGloballyPositioned { coords ->
-            state.registerExclusion(key, ExclusionZone(coords.boundsInRoot(), featherPx))
-        }
-    }
 }
 
-// Shared uniforms used by both the bloom and receiver shaders.
-internal fun RuntimeShader.setSharedLightUniforms(lights: Collection<LightSource>) {
-    val positions   = FloatArray(MAX_LIGHTS * 2)
-    val colors      = FloatArray(MAX_LIGHTS * 3)
-    val intensities = FloatArray(MAX_LIGHTS)
+// Light geometry (position + color) — used by both the bloom and receiver shaders.
+internal fun RuntimeShader.setLightGeometry(lights: Collection<LightSource>) {
+    val positions = FloatArray(MAX_LIGHTS * 2)
+    val colors    = FloatArray(MAX_LIGHTS * 3)
 
     lights.take(MAX_LIGHTS).forEachIndexed { i, light ->
         positions[i * 2]     = light.center.x
@@ -181,41 +165,22 @@ internal fun RuntimeShader.setSharedLightUniforms(lights: Collection<LightSource
         colors[i * 3]        = light.color.red
         colors[i * 3 + 1]    = light.color.green
         colors[i * 3 + 2]    = light.color.blue
-        intensities[i]       = light.intensity
     }
 
-    setFloatUniform("lightPositions",   positions)
-    setFloatUniform("lightColors",      colors)
+    setFloatUniform("lightPositions", positions)
+    setFloatUniform("lightColors",    colors)
+}
+
+// Receiver-specific: how strongly each light illuminates other elements.
+internal fun RuntimeShader.setLightIntensities(lights: Collection<LightSource>) {
+    val intensities = FloatArray(MAX_LIGHTS)
+    lights.take(MAX_LIGHTS).forEachIndexed { i, light -> intensities[i] = light.intensity }
     setFloatUniform("lightIntensities", intensities)
 }
 
-// Bloom-specific: uses bloomRadiusPx so halo size is independent of receiver reach.
-internal fun RuntimeShader.setBloomRadii(lights: Collection<LightSource>) {
-    val radii = FloatArray(MAX_LIGHTS)
-    lights.take(MAX_LIGHTS).forEachIndexed { i, light -> radii[i] = light.bloomRadiusPx }
-    setFloatUniform("bloomRadii", radii)
-}
-
-// Receiver-specific: uses radiusPx so receiver sensitivity is independent of halo size.
-internal fun RuntimeShader.setReceiverRadii(lights: Collection<LightSource>) {
-    val radii = FloatArray(MAX_LIGHTS)
-    lights.take(MAX_LIGHTS).forEachIndexed { i, light -> radii[i] = light.radiusPx }
-    setFloatUniform("lightRadii", radii)
-}
-
-// Bloom-specific: rectangles (root space) where the bloom is carved away.
-internal fun RuntimeShader.setExclusionUniforms(exclusions: Collection<ExclusionZone>) {
-    val rects   = FloatArray(MAX_EXCLUSIONS * 4)
-    val feather = FloatArray(MAX_EXCLUSIONS)
-
-    exclusions.take(MAX_EXCLUSIONS).forEachIndexed { i, zone ->
-        rects[i * 4]     = zone.bounds.left
-        rects[i * 4 + 1] = zone.bounds.top
-        rects[i * 4 + 2] = zone.bounds.right
-        rects[i * 4 + 3] = zone.bounds.bottom
-        feather[i]       = zone.featherPx
-    }
-
-    setFloatUniform("exclusionRects", rects)
-    setFloatUniform("exclusionFeather", feather)
+// Bloom-specific: how strongly each light paints its own visible halo.
+internal fun RuntimeShader.setBloomIntensities(lights: Collection<LightSource>) {
+    val intensities = FloatArray(MAX_LIGHTS)
+    lights.take(MAX_LIGHTS).forEachIndexed { i, light -> intensities[i] = light.bloomIntensity }
+    setFloatUniform("bloomIntensities", intensities)
 }
