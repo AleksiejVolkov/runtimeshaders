@@ -91,20 +91,24 @@ private class LightingScopeReceiverImpl(
         bloomIntensity: Float,
     ): Modifier = composed {
         val key = remember { Any() }
-        var center by remember { mutableStateOf(Offset.Zero) }
-        // Guard against registering at (0,0) before the first layout pass.
-        var hasPosition by remember { mutableStateOf(false) }
+        // null until the first layout pass — guards against registering at (0,0).
+        var center by remember { mutableStateOf<Offset?>(null) }
 
         DisposableEffect(key) {
             onDispose { state.unregister(key) }
         }
 
-        // SideEffect runs after every recomposition — including every animation frame —
-        // so intensity changes driven by animateFloatAsState propagate immediately.
-        SideEffect {
-            if (hasPosition) {
+        // Reading `center` HERE, in the composition phase, is what makes a layout-time
+        // position update recompose this node. Without it the SideEffect below would only
+        // re-run when some *other* input changed (e.g. animated intensity), so a light that
+        // was already on when the screen opened would never register until a param changed.
+        val resolvedCenter = center
+        if (resolvedCenter != null) {
+            // SideEffect runs after every recomposition — including every animation frame —
+            // so position and intensity changes both propagate immediately.
+            SideEffect {
                 if (intensity > 0f || bloomIntensity > 0f) {
-                    state.register(key, LightSource(center, color, intensity, bloomIntensity))
+                    state.register(key, LightSource(resolvedCenter, color, intensity, bloomIntensity))
                 } else {
                     state.unregister(key)
                 }
@@ -113,7 +117,6 @@ private class LightingScopeReceiverImpl(
 
         onGloballyPositioned { coords ->
             center = coords.boundsInRoot().center
-            hasPosition = true
         }
     }
 
