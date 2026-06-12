@@ -23,6 +23,12 @@ internal enum class PredictiveBackEffect(
         title = "Liquid drain",
         description = "Current screen softens and drains downward like liquid.",
         shaderSource = predictiveBackLiquidDrainShader
+    ),
+    SmokeDissolve(
+        id = "smoke_dissolve",
+        title = "Smoke dissolve",
+        description = "The screen billows away into rising, fading clouds of smoke from your touch.",
+        shaderSource = predictiveBackSmokeShader
     );
 
     companion object {

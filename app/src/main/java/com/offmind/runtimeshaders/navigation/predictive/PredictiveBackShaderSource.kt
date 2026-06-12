@@ -126,6 +126,107 @@ internal val predictiveBackParticleDissolveShader = """
     }
 """.trimIndent()
 
+internal val predictiveBackSmokeShader = """
+    // Value noise + domain-warped fBm built from the shared Hash21 helper. Defined at file
+    // scope (AGSL allows free functions before main) so the smoke field is real turbulence,
+    // not a single perlin layer.
+    float smokeNoise(float2 x) {
+        float2 i = floor(x);
+        float2 f = fract(x);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = Hash21(i);
+        float b = Hash21(i + float2(1.0, 0.0));
+        float c = Hash21(i + float2(0.0, 1.0));
+        float d = Hash21(i + float2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    float smokeFbm(float2 x) {
+        float v = 0.0;
+        float amp = 0.5;
+        for (int i = 0; i < 5; i++) {
+            v += amp * smokeNoise(x);
+            x = x * 2.02 + float2(13.7, 7.3);
+            amp *= 0.5;
+        }
+        return v;
+    }
+
+    half4 main(float2 fragCoord) {
+        float p = clamp(progress / 1.7, 0.0, 1.0);
+        float eased = CubicOut(p);
+
+        float shortestSide = min(resolution.x, resolution.y);
+        float2 origin = float2(clamp(touch.x, 0.0, resolution.x), clamp(touch.y, 0.0, resolution.y));
+
+        // Distance from the touch point, normalized to the shortest side.
+        float2 rel = (fragCoord - origin) / shortestSide;
+        float dist = length(rel);
+
+        // Farthest corner, so the dissolve front always clears the whole screen.
+        float2 cA = (float2(0.0, 0.0) - origin) / shortestSide;
+        float2 cB = (float2(resolution.x, 0.0) - origin) / shortestSide;
+        float2 cC = (float2(0.0, resolution.y) - origin) / shortestSide;
+        float2 cD = (resolution - origin) / shortestSide;
+        float maxDistance = max(max(length(cA), length(cB)), max(length(cC), length(cD)));
+
+        // Expanding front from the touch; pixels behind it (age -> 1) turn to smoke.
+        float front = mix(-0.15, maxDistance + 0.35, eased);
+        float band = mix(0.35, 1.15, p);
+        float age = clamp((front - dist) / band, 0.0, 1.0);
+        age = age * age * (3.0 - 2.0 * age);
+
+        // Ahead of the front the screen is untouched (and cheap).
+        if (age <= 0.001) {
+            return image.eval(fragCoord);
+        }
+
+        // ---- Billowing smoke field: domain-warped, rising fBm ----
+        float2 q = (fragCoord / shortestSide) * 3.4;
+        float t = time * 0.6;
+        q.y += t * 1.25;                                   // smoke rises
+        float2 warp = float2(
+            smokeFbm(q + float2(0.0, t)),
+            smokeFbm(q + float2(4.3, -t))
+        );
+        float density = smokeFbm(q + warp * 1.7);
+        density = pow(clamp(density * 1.3, 0.0, 1.0), 1.35);
+
+        // ---- Advect the screen into the rising / curling flow (multi-tap = motion blur) ----
+        float2 curl = float2(warp.y - 0.5, -(warp.x - 0.5));
+        float2 rise = float2(0.0, -1.0);                  // up, in pixel space
+        float2 flow = rise * 0.75 + curl * 1.35 + normalize(rel + 1e-4) * 0.30;
+        float reach = age * age * shortestSide * mix(0.05, 0.36, p);
+
+        half4 smear = half4(0.0);
+        float wsum = 0.0;
+        for (int s = 0; s < 5; s++) {
+            float fs = float(s) / 4.0;
+            float2 sc = fragCoord + flow * reach * fs + (warp - 0.5) * shortestSide * 0.06 * age * fs;
+            sc = clamp(sc, float2(0.0), resolution);
+            float w = 1.0 - fs * 0.55;
+            smear += image.eval(sc) * half(w);
+            wsum += w;
+        }
+        half4 color = smear / half(wsum);
+
+        // Drift the screen colour toward a soft smoky grey as it disperses.
+        half luma = dot(color.rgb, half3(0.299, 0.587, 0.114));
+        half3 smokeColor = half3(luma) * 1.05 + half3(0.04, 0.045, 0.05);
+        color.rgb = mix(color.rgb, smokeColor, half(age * 0.55));
+        color.rgb += half3(density * age * 0.06);          // faint internal glow in dense puffs
+
+        // ---- Alpha: solid ahead, wispy smoke behind, thinning to nothing ----
+        // The density threshold climbs with age, so the sheet breaks into wisps then clears.
+        float wisp = smoothstep(age * 0.82, age * 0.82 + 0.55, density);
+        float dissipate = 1.0 - smoothstep(0.5, 1.0, age);
+        float smokeAlpha = mix(1.0, wisp, smoothstep(0.0, 0.45, age)) * dissipate;
+        float alpha = mix(1.0, smokeAlpha, age);
+
+        return half4(color.rgb * half(alpha), color.a * half(alpha));
+    }
+""".trimIndent()
+
 internal val predictiveBackLiquidDrainShader = """
     half4 main(float2 fragCoord) {
         float p = clamp(progress / 1.7, 0.0, 1.0);
