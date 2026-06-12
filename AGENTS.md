@@ -1,104 +1,156 @@
 # Agent Guide
 
-This repository is an Android RuntimeShader playground. Prefer small, local changes that follow the existing Compose, Navigation 3, and AGSL patterns.
+Quick-start for a coding agent working in this repo. Read this first, then dip into
+[`PROJECT_MAP.md`](PROJECT_MAP.md) for the full architecture. Prefer small, local changes that
+follow the existing Compose, **Navigation 3**, AGSL, and OpenGL patterns.
 
-## What Exists
+## What This Is
 
-- Shared shader wrapper: `app/src/main/java/com/offmind/runtimeshaders/shaders/Shader.kt`
-- Shared shader container: `app/src/main/java/com/offmind/runtimeshaders/composables/Uitls.kt`
-- Shared AGSL snippets: `app/src/main/java/com/offmind/runtimeshaders/shaders/ShadersCollection.kt`
-- Generated reusable function map: `app/build/generated/src/main/java/com/offmind/runtimeshaders/generated/ShaderDependencyMap.kt`
-- Function source for generation: `buildSrc/src/main/java/com/offmind/runtimeshaders/functions/`
-- Generator task: `generateShaderDependencyMap`
-- Effects list: `app/src/main/java/com/offmind/runtimeshaders/screens/EffectsCatalog.kt`
-- Routes: `app/src/main/java/com/offmind/runtimeshaders/navigation/Routes.kt`
-- Route-to-screen mapping: `app/src/main/java/com/offmind/runtimeshaders/navigation/AppNavDisplay.kt`
-- Effect screens: `app/src/main/java/com/offmind/runtimeshaders/screens/effects/`
-- OpenGL scenes and renderer: `app/src/main/java/com/offmind/runtimeshaders/gl/`
-- Predictive-back shader system: `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/`
+An Android playground for GPU visual effects in Jetpack Compose. Three rendering techniques coexist:
+
+1. **AGSL `RuntimeShader`** — most effects, via the shared `Shader` wrapper + `ShadedBox`.
+2. **OpenGL ES** (`gl/`) — 3D scenes drawn on an embedded surface, can sample a captured Compose
+   background as a texture.
+3. **Predictive-back shader transitions** (`navigation/predictive/`) — the back gesture dissolves
+   the outgoing screen with a selectable AGSL effect.
+
+Single module `:app`; `buildSrc` code-generates the shader-function dependency map at build time.
+
+## Stack (verify before assuming)
+
+AGP `8.9.1` · Kotlin `2.1.0` · Gradle wrapper `8.11.1` · compileSdk `36` / targetSdk `35` /
+minSdk `33` · Java `17` · Compose BOM `2024.12.01` · Navigation 3 `1.0.1` · DataStore `1.1.1`.
+Koin `4.0.0` + Ktor `3.0.1` are declared and Koin is started in `MyApplication`, but
+`di/AppModule.kt` is empty — they are scaffolding, not active infra.
+
+## Key Files
+
+| Concern | File |
+|---|---|
+| Entry | `MainActivity.kt` → `RuntimeShadersApp.kt` → `navigation/RuntimeShadersNavHost.kt` |
+| Navigation (Nav3) | `navigation/AppNavDisplay.kt`, `navigation/Routes.kt` |
+| Effect catalog (landing list) | `screens/EffectsCatalog.kt`, `screens/EffectScreenData.kt` |
+| Effect screens | `screens/effects/` |
+| Shader wrapper | `shaders/Shader.kt` |
+| Shared shader container | `composables/Uitls.kt` (sic — composable is `ShadedBox`) |
+| Shared AGSL snippets | `shaders/ShadersCollection.kt` |
+| Generated function map | `app/build/generated/.../generated/ShaderDependencyMap.kt` (task `generateShaderDependencyMap`) |
+| Reusable AGSL functions (source) | `buildSrc/.../functions/` |
+| OpenGL layer | `gl/` (renderer, scenes, geometry, embedded surface, background capture) |
+| Lighting DSL | `screens/effects/lighting/` |
+| Predictive-back transitions | `navigation/predictive/`, `data/BackEffectSettingsRepository.kt` |
 
 ## Shader Wrapper Rules
 
-Use `Shader(source).getRuntimeShader(...)` for AGSL effects unless there is a specific reason to instantiate `android.graphics.RuntimeShader` directly.
+Use `Shader(source).getRuntimeShader(...)` for AGSL unless there's a specific reason to instantiate
+`android.graphics.RuntimeShader` directly. It prepends uniform declarations and the transitively
+resolved generated helper functions before the body.
 
-`Shader` prepends uniform declarations and generated helper functions before the shader source. Default uniforms come from `basicUniformList`:
+Default uniforms come from `basicUniformList`:
 
-```text
+```glsl
 uniform shader image;
-uniform vec2 resolution;
+uniform vec2  resolution;
 uniform float time;
 uniform float percentage;
 ```
 
-Use `basicUniformList.addUniform(Uniform.Type... to "name")` for shader-specific uniforms. Use `removeUniform(...)` only when a shader intentionally does not need one of the defaults.
-
-`ShaderTypedValue` supports `FloatType`, `Vec2Type`, `Vec3Type`, `Vec4Type`, `IntType`, and `Vec2Array`.
+- `basicUniformList.addUniform(Uniform.Type.X to "name")` for extra uniforms; `removeUniform("name")`
+  only when a shader intentionally drops a default.
+- `customFunctions` defaults to *all* generated functions; pass a smaller `Set<ShaderFunction>` for
+  narrow shaders (see `PredictiveBackDissolve.kt`, which uses only `CubicOut` + `Hash21`).
+- `ShaderTypedValue`: `FloatType`, `Vec2Type`, `Vec3Type`, `Vec4Type`, `IntType`, `Vec2Array`.
 
 ## ShadedBox Rules
 
-Use `ShadedBox` from `com.offmind.runtimeshaders.composables`.
+Use `ShadedBox` from `com.offmind.runtimeshaders.composables`. Full API in
+[`SHADER_BOX_USAGE.md`](SHADER_BOX_USAGE.md).
 
-- With child content, `ShadedBox` applies a runtime shader render effect to that content and uses the `image` shader uniform.
-- Without child content, `ShadedBox` draws the shader directly into the box.
-- `resolution` is set automatically from the composable size.
-- Set `includeTime = true` when the shader should animate from the built-in time state.
-- Pass all other uniforms through `shaderUniforms`.
-
-Do not add duplicate local versions of `ShadedBox`; extend the shared implementation only if the behavior is broadly useful.
+- **With `content`** → applies a runtime-shader render effect to the children; shader must declare
+  and sample `uniform shader image`.
+- **Without `content`** → draws the shader directly into the box.
+- `resolution` is set automatically; set `includeTime = true` to animate from the built-in time.
+- Pass other uniforms through `shaderUniforms`.
+- `remember { ... }` the shader so it isn't recreated each recomposition.
+- Don't fork local `ShadedBox` copies. For per-entry / scoped effects, apply
+  `RenderEffect.createRuntimeShaderEffect(...).asComposeRenderEffect()` in a `graphicsLayer`
+  directly (see the predictive-back and lighting code).
 
 ## Generated Function Rules
 
-Reusable AGSL helpers are stored in `buildSrc/src/main/java/com/offmind/runtimeshaders/functions/`.
+Reusable AGSL helpers live in `buildSrc/.../functions/`, each file exporting an
+`all<Category>Functions` map keyed by the **exact AGSL function name**. The generator
+(`createDependencies.kt`) combines the maps, scans bodies for references to other names, and emits
+the `ShaderFunction` enum + dependency map. `Shader.kt` resolves dependencies (and detects cycles)
+before appending the effect source.
 
-The generation flow is:
+To add a function:
 
-1. Function strings are collected from `allColorCorrectionFunctions`, `allSdfFunctions`, `allEasingFunctions`, `allNoisesFunctions`, `allCommonFunctions`, and `allTransformationsFunctions`.
-2. `createDependencies.kt` scans function bodies for references to other function names.
-3. `generateShaderDependencyMap` writes `ShaderDependencyMap.kt`.
-4. `Shader.kt` resolves requested functions and dependencies before appending the effect source.
+1. Add the AGSL body as a Kotlin string to the relevant map, keyed by the exact function name.
+2. If you create a new aggregate map, append it in `createDependencies.kt`.
+3. Run `./gradlew generateShaderDependencyMap` (or any build).
+4. Call it by name in shader source — ordering/deps are automatic.
 
-When adding a reusable function:
+Keep names distinct: dependency detection is substring-based.
 
-1. Add a Kotlin string with the AGSL function body.
-2. Add it to the relevant `all...Functions` map using the exact AGSL function name as the key.
-3. If you create a new aggregate map, import and append it to `allFunctions` in `createDependencies.kt`.
-4. Build or run `./gradlew generateShaderDependencyMap`.
+## Adding A New Effect (3 edits)
 
-Avoid ad hoc string injection in effect screens when the helper should be shared.
+1. Composable screen in `screens/effects/`.
+2. AGSL source near the screen (local) or in `ShadersCollection.kt` (shared).
+3. `val shader = remember { Shader(source).getRuntimeShader(...) }`; render with `ShadedBox`.
+4. Add a `Route` in `Routes.kt`.
+5. Register it in `routeEntryProvider(...)` **and** add the `RouteContent(...)` `when` branch in
+   `AppNavDisplay.kt`.
+6. Add an `EffectScreenData` entry in `EffectsCatalog.kt`.
+7. Verify: `./gradlew :app:compileDebugKotlin`.
 
-## Adding A New Effect
+There is **no** `NavHost`/`composable<>` registration in `MainActivity` anymore — navigation is
+Nav3 via `AppNavDisplay.kt`. Keep titles/descriptions consistent between the catalog and the route.
 
-1. Add a composable screen under `app/src/main/java/com/offmind/runtimeshaders/screens/effects/`.
-2. Put the AGSL source near the screen if it is local-only, or in `ShadersCollection.kt` if other screens may reuse it.
-3. Create the runtime shader with `remember { Shader(source).getRuntimeShader(...) }`.
-4. Render it with `ShadedBox`.
-5. Add custom uniforms to the shader declaration list and pass matching `ShaderTypedValue` entries.
-6. Add a route type to `Route` in `Routes.kt`.
-7. Register the route in `routeEntryProvider(...)` in `AppNavDisplay.kt`.
-8. Add the `RouteContent(...)` branch that calls the new screen.
-9. Add an `EffectScreenData` entry in `EffectsCatalog.kt`.
-10. Verify with `./gradlew :app:compileDebugKotlin`.
+## OpenGL Effects
 
-Keep effect titles and descriptions consistent between `EffectsCatalog.kt` and route construction.
+3D scenes implement `GlScene` (`gl/scene/`) and render through `EmbeddedGlSurface` /
+`CapturedBackgroundGlBox` (`gl/compose/`). When the scene should refract/sample the Compose UI
+behind it, wrap with `CapturedBackgroundGlBox` and pass `backgroundContent`. Reuse existing geometry
+helpers in `gl/geometry/`. See `RotatingGlassCubeScene` and `TapePlaneScene` for the pattern.
+
+## Lighting Scope
+
+`LightingScope { ... }` (`screens/effects/lighting/`) exposes scoped modifiers
+`Modifier.lightSource(...)` and `Modifier.receivesLight(...)`. Light geometry is pushed into bloom
+and receiver shaders as fixed-size arrays capped at `MAX_LIGHTS`. Follow `DualLightTextureScreen` /
+`IlluminateUiScreen`. New scoped modifiers go on `LightingScopeReceiver`.
 
 ## Predictive Back Effects
 
-Predictive-back effects live under `navigation/predictive/`. They are not normal catalog effects. When adding one, follow the existing `PredictiveBackEffect` and `PredictiveBackShaderSource` patterns, then verify the picker and navigation gesture flow.
+Live under `navigation/predictive/`, hook the global back gesture, and are **not** catalog effects.
+To add one: add a `PredictiveBackEffect` enum entry + its AGSL in `PredictiveBackShaderSource.kt`,
+then verify the picker (`BackEffectPickerScreen`), DataStore persistence
+(`BackEffectSettingsRepository`), and the gesture flow in `AppNavDisplay.kt`. Background:
+[`PREDICTIVE_BACK_SHADER_NAV3_ARTICLE.md`](PREDICTIVE_BACK_SHADER_NAV3_ARTICLE.md).
 
-## Build And Verification
-
-Preferred checks:
+## Build & Verify
 
 ```bash
-./gradlew :app:compileDebugKotlin
-./gradlew assembleDebug
+./gradlew :app:compileDebugKotlin   # fast check
+./gradlew assembleDebug             # full build
+./gradlew generateShaderDependencyMap  # regenerate the function map
 ```
 
-The Gradle wrapper is already approved for local use in this environment. The project targets Java 17.
+Gradle wrapper is approved for local use; project targets Java 17 (see `BUILD_SETUP.md`).
 
-## Documentation Notes
+## Gotchas
 
-- `README.md` is the human-facing project map.
-- `SHADER_BOX_USAGE.md` contains an older focused guide for `ShadedBox`.
-- `BUILD_SETUP.md` contains local IDE and Java setup notes.
-- Keep this file updated when the effect registration path, shader wrapper, generated function flow, or shared `ShadedBox` behavior changes.
+- `composables/Uitls.kt` is misspelled — renaming touches many imports.
+- `EffectsCatalog.kt` has placeholder route titles ("Test Shader") for several entries; the visible
+  label is the `EffectScreenData.title`, not the route's.
+- `WashDownViewScreen.kt`, `EdgeFadeModifier.kt`, `SampleUiElements.kt` are demo/support, not all
+  wired into the catalog.
+- Substring-based dependency detection in the generator — avoid helper-name collisions.
+
+## Keeping Docs Current
+
+Update this file and [`PROJECT_MAP.md`](PROJECT_MAP.md) when the effect-registration path, shader
+wrapper, generated-function flow, navigation model, GL layer, lighting scope, or `ShadedBox`
+behavior changes. `README.md` is the human-facing overview; `SHADER_BOX_USAGE.md` is the focused
+`ShadedBox` API.

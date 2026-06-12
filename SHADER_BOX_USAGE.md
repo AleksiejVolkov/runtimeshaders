@@ -1,71 +1,115 @@
-# ShaderBox Composable
+# ShadedBox Composable
 
-The `ShaderBox` is a Compose UI component that lets developers apply rich shader effects to any content within a `Box`. This component is particularly useful for achieving custom graphics and animations using AGSL (Android Graphics Shading Language).
+`ShadedBox` is the shared Compose component for applying an AGSL `RuntimeShader` to UI. It lives in
+`app/src/main/java/com/offmind/runtimeshaders/composables/Uitls.kt` (filename is misspelled — the
+composable itself is `ShadedBox`).
 
-## Features
-- **Shader Effects**: Apply custom shading logic using AGSL via the `Shader` API.
-- **Uniform Control**: Pass uniform data to your shaders using `ShaderTypedValue`.
-- **Resolution and Time Control**: Automatically manages resolution and time uniforms for animations.
-- **Composable Content**: Allows integration of complex UI components.
-- **Highly Customizable**: Works with various types of uniform data like float, vectors, etc.
+> Pair it with the `Shader` wrapper (`shaders/Shader.kt`) rather than building a `RuntimeShader`
+> by hand — see [`README.md`](README.md) and [`PROJECT_MAP.md`](PROJECT_MAP.md) for the shader
+> plumbing and the generated helper-function system.
 
-## How to Use
+## What It Does
 
-### Import the Dependency
-Ensure you have the necessary shader utilities in your project setup:
-```kotlin
-import com.offmind.runtimeshaders.composables.ShadedBox
-import com.offmind.runtimeshaders.shaders.Shader
-import com.offmind.runtimeshaders.shaders.ShaderTypedValue
-```
+- Applies an AGSL shader to a `Box`, either as a post-process **render effect over child content**
+  or as a **direct shader draw** with no content.
+- Manages the `resolution` uniform automatically from the layout size.
+- Optionally advances a `time` uniform for animation.
+- Maps typed uniform values (`ShaderTypedValue`) to the shader before each draw.
 
-### Basic Usage
-To create a simple shader effect using `ShaderBox`, pass a `RuntimeShader` and optionally define uniforms:
+## Signature
 
 ```kotlin
 @Composable
-fun ShaderExampleScreen() {
-    val myShader = remember {
-        Shader("your-shader-code-here").getRuntimeShader()
-    }
+fun ShadedBox(
+    modifier: Modifier = Modifier,
+    shader: RuntimeShader,
+    shaderUniforms: Map<String, ShaderTypedValue> = emptyMap(),
+    includeTime: Boolean = false,
+    content: (@Composable () -> Unit)? = null,
+)
+```
 
+## Two Modes
+
+**With `content`** — the shader post-processes the composable children via
+`RenderEffect.createRuntimeShaderEffect(shader, "image")` inside a `graphicsLayer`. The shader
+**must** declare `uniform shader image;` and sample it (the children are the `image` input).
+
+```kotlin
+@Composable
+fun ShaderOverContent() {
+    val shader = remember { Shader(myAgsl).getRuntimeShader() }
     ShadedBox(
-        shader = myShader,
+        shader = shader,
+        includeTime = true,
         shaderUniforms = mapOf(
-            "myUniform" to ShaderTypedValue.FloatType(1.0f), // Example uniform
-        )
+            "percentage" to ShaderTypedValue.FloatType(0.5f),
+        ),
     ) {
-        // Place any composable content here.
+        // any Compose UI — this is what the shader receives as `image`
+        Text("Hello")
     }
 }
 ```
 
-### Shader Uniforms
-`ShaderBox` allows customization of the shader with various uniform types:
-- **Float**: `ShaderTypedValue.FloatType(value: Float)`
-- **Vec2**: `ShaderTypedValue.Vec2Type(x: Float, y: Float)`
-- **Vec3**: `ShaderTypedValue.Vec3Type(x: Float, y: Float, z: Float)`
-- **Vec4**: `ShaderTypedValue.Vec4Type(x: Float, y: Float, z: Float, w: Float)`
-
-### Time and Resolution Management
-Built-in management of time and resolution can be enabled:
+**Without `content`** — the shader is drawn directly into the box with `drawBehind` + a framework
+`Paint`. Use this for generative backgrounds that don't sample UI. Give the box a size via
+`modifier`.
 
 ```kotlin
 ShadedBox(
-    shader = myShader,
-    includeTime = true,  // Automatically handle the "time" uniform
-    shaderUniforms = mapOf("resolution" to ShaderTypedValue.Vec2Type(1080f, 1920f))
-) {
-    // Composable UI
+    modifier = Modifier.fillMaxSize(),
+    shader = remember { Shader(backgroundAgsl).getRuntimeShader() },
+    includeTime = true,
+)
+```
+
+## Uniforms
+
+`resolution` is set automatically on size change. `time` is advanced only when
+`includeTime = true` (driven by `provideTimeAsState`, which increments `0.01f` every 10 ms). Pass
+everything else through `shaderUniforms` using `ShaderTypedValue`:
+
+| `ShaderTypedValue` | AGSL type | Setter used |
+|---|---|---|
+| `FloatType(value)` | `float` | `setFloatUniform` |
+| `Vec2Type(x, y)` | `vec2` | `setFloatUniform` |
+| `Vec3Type(x, y, z)` | `vec3` | `setFloatUniform` |
+| `Vec4Type(x, y, z, w)` | `vec4` | `setFloatUniform` |
+| `IntType(value)` | `int` | `setIntUniform` |
+| `Vec2Array(values)` | `vec2[N]` | `setVec2ArrayUniform` (padded to `maxSize`, default 10) |
+
+The default uniforms declared by `Shader` (`basicUniformList`) are:
+
+```glsl
+uniform shader image;
+uniform vec2  resolution;
+uniform float time;
+uniform float percentage;
+```
+
+Add shader-specific uniforms before building the `RuntimeShader`:
+
+```kotlin
+val shader = remember {
+    Shader(myAgsl).getRuntimeShader(
+        uniforms = basicUniformList
+            .addUniform(Uniform.Type.VEC2 to "pointer")
+            .removeUniform("percentage"),
+    )
 }
 ```
 
-### Example Use Cases
-1. **Animated Backgrounds**: Using dynamic shaders to create animations as the background.
-2. **Interactive Effects**: Shader effects that respond to user interaction, such as pointer-based distortions.
-3. **Artistic Touches**: Enhance images or UI components with visual style through shaders.
+Then supply matching runtime values via `shaderUniforms` (e.g. `"pointer" to Vec2Type(x, y)`).
 
-### Advanced Capabilities
-With the ShaderBox, you can include any shader logic compatible with AGSL. Use custom shader functions from dependencies included in your `Shader` setup, leveraging a variety of predefined visual effects.
+## Notes
 
-By managing shader code and configuration within the Compose framework, `ShaderBox` seamlessly integrates into the UI ecosystem with ease while providing powerful graphical effects.
+- The shader is mutated in place each frame; `ShadedBox` does not recreate it. Wrap creation in
+  `remember` so it survives recomposition.
+- For effects that need finer control than `ShadedBox` offers (e.g. per-entry render effects, the
+  predictive-back dissolve, or the lighting scope), apply
+  `RenderEffect.createRuntimeShaderEffect(...).asComposeRenderEffect()` directly in a
+  `graphicsLayer` — see `navigation/predictive/PredictiveBackDissolve.kt` and
+  `screens/effects/lighting/LightingScope.kt` for examples.
+- Don't fork local copies of `ShadedBox`; extend the shared one only if the behavior is broadly
+  useful.

@@ -1,20 +1,29 @@
 # Runtime Shaders
 
-Android shader playground for AGSL runtime shader effects, Compose examples, OpenGL scenes, and predictive-back shader transitions.
+Android shader playground for AGSL runtime shader effects, Compose examples, OpenGL scenes, and predictive-back shader transitions. The app opens to a catalog of effect demos and navigates to individual screens using **Navigation 3**.
+
+Three rendering techniques coexist:
+
+1. **AGSL `RuntimeShader`** — most effects, via the shared `Shader` wrapper and `ShadedBox`.
+2. **OpenGL ES** (`gl/`) — 3D scenes drawn on an embedded surface, optionally sampling a captured Compose background as a texture.
+3. **Predictive-back shader transitions** (`navigation/predictive/`) — the back gesture dissolves the outgoing screen with a selectable AGSL effect.
 
 ## Project Map
 
 - `app/src/main/java/com/offmind/runtimeshaders/screens/effects/` contains the example effect screens.
 - `app/src/main/java/com/offmind/runtimeshaders/screens/EffectsCatalog.kt` controls what appears in the effects list.
 - `app/src/main/java/com/offmind/runtimeshaders/navigation/Routes.kt` defines Navigation 3 route keys.
-- `app/src/main/java/com/offmind/runtimeshaders/navigation/AppNavDisplay.kt` maps routes to composable screens.
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/AppNavDisplay.kt` maps routes to composable screens and drives the predictive-back gesture.
 - `app/src/main/java/com/offmind/runtimeshaders/shaders/Shader.kt` wraps AGSL code, declares uniforms, and injects generated helper functions.
 - `app/src/main/java/com/offmind/runtimeshaders/shaders/ShadersCollection.kt` stores shared AGSL effect snippets used by several screens.
 - `app/src/main/java/com/offmind/runtimeshaders/composables/Uitls.kt` contains `ShadedBox`, `provideTimeAsState`, and shader uniform application helpers.
 - `buildSrc/src/main/java/com/offmind/runtimeshaders/functions/` contains reusable AGSL helper functions such as noise, SDF, easing, color correction, and transformations.
 - `buildSrc/src/main/java/com/offmind/runtimeshaders/scripts/` generates the shader dependency map used by `Shader`.
-- `app/src/main/java/com/offmind/runtimeshaders/gl/` contains OpenGL renderer, scene, geometry, and GL shader support.
-- `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/` contains predictive-back shader effects and state.
+- `app/src/main/java/com/offmind/runtimeshaders/gl/` contains the OpenGL renderer, scenes, geometry, embedded-surface composables, and Compose background capture.
+- `app/src/main/java/com/offmind/runtimeshaders/screens/effects/lighting/` contains the `LightingScope` DSL (scoped `lightSource` / `receivesLight` modifiers and their shaders).
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/` contains predictive-back shader effects and state; `data/BackEffectSettingsRepository.kt` persists the chosen effect.
+
+For the full architecture, file-by-file breakdown, and tech-stack versions, see [`PROJECT_MAP.md`](PROJECT_MAP.md). Agents should start with [`AGENTS.md`](AGENTS.md).
 
 ## Shared Shader Helpers
 
