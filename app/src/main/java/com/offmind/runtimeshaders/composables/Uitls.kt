@@ -28,7 +28,7 @@ fun provideTimeAsState(initialValue: Float = 0f): State<Float> {
     LaunchedEffect(Unit) {
         while (true) {
             timeState.floatValue += 0.01f
-            delay(10.milliseconds)
+            delay(1.milliseconds)
         }
     }
 

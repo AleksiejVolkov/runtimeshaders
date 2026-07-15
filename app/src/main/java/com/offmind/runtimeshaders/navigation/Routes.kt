@@ -41,6 +41,9 @@ sealed class Route : NavKey {
     data class ColorfulToggle(val title: String, val description: String) : Route()
 
     @Serializable
+    data class NeonFogButton(val title: String, val description: String) : Route()
+
+    @Serializable
     data class DualLightTexture(val title: String, val description: String) : Route()
 
     @Serializable

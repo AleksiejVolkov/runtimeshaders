@@ -52,6 +52,7 @@ import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
 import com.offmind.runtimeshaders.screens.effects.MetaballsShaderScreen
 import com.offmind.runtimeshaders.screens.effects.NavigationTestFeedScreen
 import com.offmind.runtimeshaders.screens.effects.NavigationTestScreen
+import com.offmind.runtimeshaders.screens.effects.NeonFogButtonScreen
 import com.offmind.runtimeshaders.screens.effects.SnowDialogScreen
 import com.offmind.runtimeshaders.screens.effects.TapePlaneTestScreen
 import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
@@ -204,6 +205,7 @@ private fun routeEntryProvider(callbacks: RouteCallbacks): (NavKey) -> NavEntry<
         routeContentEntry<Route.CanvasDeform>(callbacks)
         routeContentEntry<Route.Metaballs>(callbacks)
         routeContentEntry<Route.ColorfulToggle>(callbacks)
+        routeContentEntry<Route.NeonFogButton>(callbacks)
         routeContentEntry<Route.DualLightTexture>(callbacks)
         routeContentEntry<Route.NavigationTest>(callbacks)
         routeContentEntry<Route.NavigationTestFeed>(callbacks)
@@ -252,6 +254,7 @@ internal fun RouteContent(
         is Route.CanvasDeform -> CanvasDeformScreen()
         is Route.Metaballs -> MetaballsShaderScreen()
         is Route.ColorfulToggle -> ColorfulToggleScreen()
+        is Route.NeonFogButton -> NeonFogButtonScreen()
         is Route.DualLightTexture -> DualLightTextureScreen()
         is Route.NavigationTest -> NavigationTestScreen(
             onLogin = {

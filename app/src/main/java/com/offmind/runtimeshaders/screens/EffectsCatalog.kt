@@ -76,6 +76,14 @@ internal val effectsCatalog = listOf(
         )
     ),
     EffectScreenData(
+        title = "Neon Fog Button",
+        description = "Rounded button with an expanding neon fog burst",
+        screenRoute = Route.NeonFogButton(
+            "Neon Fog Button",
+            "Rounded button with an expanding neon fog burst"
+        )
+    ),
+    EffectScreenData(
         title = "Dual Light Texture",
         description = "Pink and blue light shared across UI elements",
         screenRoute = Route.DualLightTexture(
