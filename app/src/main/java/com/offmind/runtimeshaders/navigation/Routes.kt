@@ -57,4 +57,7 @@ sealed class Route : NavKey {
 
     @Serializable
     data class BurnAfterReading(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NeumorphismBasics(val title: String, val description: String) : Route()
 }

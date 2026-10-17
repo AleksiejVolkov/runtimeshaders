@@ -4,6 +4,14 @@ import com.offmind.runtimeshaders.navigation.Route
 
 internal val effectsCatalog = listOf(
     EffectScreenData(
+        title = "Neumorphism · basics",
+        description = "Flat, concave and pressed forms from one light",
+        screenRoute = Route.NeumorphismBasics(
+            "Neumorphism · basics",
+            "Flat, concave and pressed forms from one light"
+        )
+    ),
+    EffectScreenData(
         title = "Burn After Reading",
         description = "A note that burns away from the long-press point",
         screenRoute = Route.BurnAfterReading(
