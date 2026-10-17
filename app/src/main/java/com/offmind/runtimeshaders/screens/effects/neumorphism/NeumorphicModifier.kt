@@ -31,6 +31,7 @@ val LocalLightDirection = compositionLocalOf { Offset(-0.7071f, -0.7071f) }
 fun Modifier.neumorphic(
     cornerRadius: Dp,
     curve: Float = 0f,          // 0 = flat plate, < 0 = concave dish
+    press: Float = 0f,          // 0 = raised, 1 = pressed into the surface
     distance: Dp = 8.dp,
     blur: Dp = 16.dp,
 ): Modifier = composed {
@@ -46,6 +47,7 @@ fun Modifier.neumorphic(
         shader.setFloatUniform("shadowShift", distance.toPx())
         shader.setFloatUniform("shadowBlur", blur.toPx())
         shader.setFloatUniform("curve", curve)
+        shader.setFloatUniform("press", press)
         shader.setColorUniform("baseColor", NeuColors.Base.toArgb())
         shader.setColorUniform("darkColor", NeuColors.Dark.toArgb())
         shader.setColorUniform("lightColor", NeuColors.Light.toArgb())
@@ -65,6 +67,7 @@ private val neumorphicShader = """
     uniform float shadowShift;    // how far the shadows are moved, px
     uniform float shadowBlur;     // how soft they are, px
     uniform float curve;          // 0 = flat, < 0 = concave
+    uniform float press;          // 0 = raised, 1 = pressed in
     layout(color) uniform half4 baseColor;
     layout(color) uniform half4 darkColor;
     layout(color) uniform half4 lightColor;
@@ -87,8 +90,8 @@ private val neumorphicShader = """
         float inside = 1.0 - smoothstep(-0.75, 0.75, Shape(p));
 
         // the same shape, moved away from the light and towards it
-        float dark = Soft(Shape(p + lightDir * shadowShift), shadowBlur) * 0.62;
-        float lite = Soft(Shape(p - lightDir * shadowShift), shadowBlur) * 0.8;
+        float dark = Soft(Shape(p + lightDir * shadowShift), shadowBlur) * 0.62 * (1.0 - press);
+        float lite = Soft(Shape(p - lightDir * shadowShift), shadowBlur) * 0.8 * (1.0 - press);
 
         // the highlight over the shadow, premultiplied
         half4 shadows = half4(lightColor.rgb * lite + darkColor.rgb * dark * (1.0 - lite),
@@ -98,6 +101,12 @@ private val neumorphicShader = """
         float3 n = normalize(float3(2.0 * curve * q, 1.0));   // normal of the dish
         float3 L = normalize(float3(lightDir * 0.6, 0.8));    // the same light, a bit above the screen
         half4 surface = half4(baseColor.rgb * (1.0 + 0.9 * (dot(n, L) - L.z)), 1.0);
+
+        // pressed: the same two shadows, but inside the shape and with the opposite sign
+        float innerDark = 1.0 - Soft(Shape(p + lightDir * shadowShift * 0.5), shadowBlur * 0.5);
+        float innerLite = 1.0 - Soft(Shape(p - lightDir * shadowShift * 0.5), shadowBlur * 0.5);
+        surface.rgb = mix(surface.rgb, darkColor.rgb, innerDark * 0.6 * press);
+        surface.rgb = mix(surface.rgb, lightColor.rgb, innerLite * 0.8 * press);
         return mix(shadows, surface, inside);
     }
 """.trimIndent()
