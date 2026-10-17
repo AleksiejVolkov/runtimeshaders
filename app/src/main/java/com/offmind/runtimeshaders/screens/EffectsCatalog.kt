@@ -4,6 +4,14 @@ import com.offmind.runtimeshaders.navigation.Route
 
 internal val effectsCatalog = listOf(
     EffectScreenData(
+        title = "Burn After Reading",
+        description = "A note that burns away from the long-press point",
+        screenRoute = Route.BurnAfterReading(
+            "Burn After Reading",
+            "A note that burns away from the long-press point"
+        )
+    ),
+    EffectScreenData(
         title = "Lamp with Shadow",
         description = "A lamp with a shadow effect",
         screenRoute = Route.LampShadow(

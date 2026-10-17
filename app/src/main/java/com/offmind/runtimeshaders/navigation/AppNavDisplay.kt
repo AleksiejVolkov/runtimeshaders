@@ -44,6 +44,7 @@ import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackRenderStat
 import com.offmind.runtimeshaders.screens.AllEffectsListScreen
 import com.offmind.runtimeshaders.screens.BackEffectPickerScreen
 import com.offmind.runtimeshaders.screens.SettingsScreen
+import com.offmind.runtimeshaders.screens.effects.BurnAfterReadingScreen
 import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
 import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
 import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
@@ -210,6 +211,7 @@ private fun routeEntryProvider(callbacks: RouteCallbacks): (NavKey) -> NavEntry<
         routeContentEntry<Route.NavigationTest>(callbacks)
         routeContentEntry<Route.NavigationTestFeed>(callbacks)
         routeContentEntry<Route.IlluminateUi>(callbacks)
+        routeContentEntry<Route.BurnAfterReading>(callbacks)
     }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
@@ -268,5 +270,6 @@ internal fun RouteContent(
         )
         is Route.NavigationTestFeed -> NavigationTestFeedScreen()
         is Route.IlluminateUi -> IlluminateUiScreen()
+        is Route.BurnAfterReading -> BurnAfterReadingScreen()
     }
 }

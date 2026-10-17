@@ -54,4 +54,7 @@ sealed class Route : NavKey {
 
     @Serializable
     data class IlluminateUi(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class BurnAfterReading(val title: String, val description: String) : Route()
 }
