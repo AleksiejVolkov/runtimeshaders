@@ -5,7 +5,12 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateOffsetAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -22,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,9 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.center
+import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -43,12 +53,36 @@ fun NeuSurface(
     content: @Composable BoxScope.() -> Unit,
 ) {
     LightStatusBar()
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(NeuColors.Base),
-        content = content
+    // the light follows the finger and springs back when it's released
+    var target by remember { mutableStateOf(DefaultLight) }
+    val light = animateOffsetAsState(
+        targetValue = target,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow),
+        label = "light"
     )
+    CompositionLocalProvider(LocalLightDirection provides light) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(NeuColors.Base)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        // Initial pass: we only watch the finger, buttons still get their clicks
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val finger = event.changes.first().position
+                            val fromCenter = finger - size.center.toOffset()
+                            if (fromCenter.getDistance() > 1f) {
+                                target = fromCenter / fromCenter.getDistance()
+                            }
+                        } while (event.changes.any { it.pressed })
+                        target = DefaultLight
+                    }
+                },
+            content = content
+        )
+    }
 }
 
 @Composable

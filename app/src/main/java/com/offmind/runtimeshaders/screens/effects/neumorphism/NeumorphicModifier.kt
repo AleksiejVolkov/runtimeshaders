@@ -1,8 +1,10 @@
 package com.offmind.runtimeshaders.screens.effects.neumorphism
 
 import android.graphics.RuntimeShader
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
@@ -26,8 +28,10 @@ object NeuColors {
     val Accent = Color(0xFF3BD37A)  // status LED
 }
 
-// one light for the whole screen: a unit vector pointing towards it (screen space, y goes down)
-val LocalLightDirection = compositionLocalOf { Offset(-0.7071f, -0.7071f) }
+// one light for the whole screen: a unit vector pointing towards it (screen space, y goes down).
+// It's a State, so a moving light only redraws the elements, without recomposition.
+val DefaultLight = Offset(-0.7071f, -0.7071f)
+val LocalLightDirection = staticCompositionLocalOf<State<Offset>> { mutableStateOf(DefaultLight) }
 
 fun Modifier.neumorphic(
     cornerRadius: Dp,
@@ -40,11 +44,12 @@ fun Modifier.neumorphic(
     val shader = remember { RuntimeShader(neumorphicShader) }
     val brush = remember { ShaderBrush(shader) }
     drawBehind {
+        val l = light.value          // <-- read here, inside the draw phase
         // shadows live outside of the element: they can't go further than shift + blur
         val margin = (distance + blur).toPx() + 2f
         shader.setFloatUniform("size", size.width, size.height)
         shader.setFloatUniform("radius", min(cornerRadius.toPx(), size.minDimension / 2f))
-        shader.setFloatUniform("lightDir", light.x, light.y)
+        shader.setFloatUniform("lightDir", l.x, l.y)
         shader.setFloatUniform("shadowShift", distance.toPx())
         shader.setFloatUniform("shadowBlur", blur.toPx())
         shader.setFloatUniform("curve", curve)
