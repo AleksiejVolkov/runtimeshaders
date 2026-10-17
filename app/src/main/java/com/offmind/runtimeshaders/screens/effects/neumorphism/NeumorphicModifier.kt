@@ -33,9 +33,17 @@ object NeuColors {
 
 // the same five colors for each theme; the shader doesn't care which one it gets
 @Immutable
-data class NeuPalette(val base: Color, val dark: Color, val light: Color, val text: Color, val hint: Color)
+data class NeuPalette(
+    val base: Color,
+    val dark: Color,
+    val light: Color,
+    val text: Color,
+    val hint: Color,
+)
 
-val LightPalette = NeuPalette(NeuColors.Base, NeuColors.Dark, NeuColors.Light, NeuColors.Text, NeuColors.Hint)
+val LightPalette = NeuPalette(
+    NeuColors.Base, NeuColors.Dark, NeuColors.Light, NeuColors.Text, NeuColors.Hint
+)
 
 // in the dark, the highlight can't be white: it's just a slightly lighter base
 val DarkPalette = NeuPalette(
@@ -55,7 +63,9 @@ fun lerp(a: NeuPalette, b: NeuPalette, t: Float) = NeuPalette(
 )
 
 // a State again, so switching the theme only redraws the elements
-val LocalNeuPalette = staticCompositionLocalOf<State<NeuPalette>> { mutableStateOf(LightPalette) }
+val LocalNeuPalette = staticCompositionLocalOf<State<NeuPalette>> {
+    mutableStateOf(LightPalette)
+}
 
 @Composable
 fun neuColors(): NeuPalette = LocalNeuPalette.current.value

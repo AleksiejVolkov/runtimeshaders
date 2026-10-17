@@ -56,7 +56,11 @@ fun NeuSurface(
 ) {
     StatusBarIcons(darkIcons = !dark)
     // the theme is just a different set of colors: animate between the two palettes
-    val theme by animateFloatAsState(if (dark) 1f else 0f, tween(durationMillis = 700), label = "theme")
+    val theme by animateFloatAsState(
+        targetValue = if (dark) 1f else 0f,
+        animationSpec = tween(durationMillis = 700),
+        label = "theme"
+    )
     val palette = remember { derivedStateOf { lerp(LightPalette, DarkPalette, theme) } }
     // the light follows the finger and springs back when it's released
     var target by remember { mutableStateOf(DefaultLight) }
@@ -65,7 +69,10 @@ fun NeuSurface(
         animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow),
         label = "light"
     )
-    CompositionLocalProvider(LocalLightDirection provides light, LocalNeuPalette provides palette) {
+    CompositionLocalProvider(
+        LocalLightDirection provides light,
+        LocalNeuPalette provides palette,
+    ) {
         Box(
             modifier = modifier
                 .fillMaxSize()
