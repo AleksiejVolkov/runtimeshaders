@@ -30,6 +30,7 @@ val LocalLightDirection = compositionLocalOf { Offset(-0.7071f, -0.7071f) }
 
 fun Modifier.neumorphic(
     cornerRadius: Dp,
+    curve: Float = 0f,          // 0 = flat plate, < 0 = concave dish
     distance: Dp = 8.dp,
     blur: Dp = 16.dp,
 ): Modifier = composed {
@@ -44,6 +45,7 @@ fun Modifier.neumorphic(
         shader.setFloatUniform("lightDir", light.x, light.y)
         shader.setFloatUniform("shadowShift", distance.toPx())
         shader.setFloatUniform("shadowBlur", blur.toPx())
+        shader.setFloatUniform("curve", curve)
         shader.setColorUniform("baseColor", NeuColors.Base.toArgb())
         shader.setColorUniform("darkColor", NeuColors.Dark.toArgb())
         shader.setColorUniform("lightColor", NeuColors.Light.toArgb())
@@ -62,6 +64,7 @@ private val neumorphicShader = """
     uniform float2 lightDir;      // unit vector pointing towards the light
     uniform float shadowShift;    // how far the shadows are moved, px
     uniform float shadowBlur;     // how soft they are, px
+    uniform float curve;          // 0 = flat, < 0 = concave
     layout(color) uniform half4 baseColor;
     layout(color) uniform half4 darkColor;
     layout(color) uniform half4 lightColor;
@@ -90,7 +93,11 @@ private val neumorphicShader = """
         // the highlight over the shadow, premultiplied
         half4 shadows = half4(lightColor.rgb * lite + darkColor.rgb * dark * (1.0 - lite),
                               lite + dark * (1.0 - lite));
-        half4 surface = baseColor;
+        // the surface: Lambert on a very shallow dish
+        float2 q = (p - size * 0.5) / (size * 0.5);          // -1..1 across the element
+        float3 n = normalize(float3(2.0 * curve * q, 1.0));   // normal of the dish
+        float3 L = normalize(float3(lightDir * 0.6, 0.8));    // the same light, a bit above the screen
+        half4 surface = half4(baseColor.rgb * (1.0 + 0.9 * (dot(n, L) - L.z)), 1.0);
         return mix(shadows, surface, inside);
     }
 """.trimIndent()

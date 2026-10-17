@@ -34,15 +34,21 @@ fun NeuSurface(
 @Composable
 fun NeumorphismBasicsScreen() {
     NeuSurface {
-        Row(
+        Column(
             modifier = Modifier.align(Alignment.Center),
-            horizontalArrangement = Arrangement.spacedBy(64.dp)
+            verticalArrangement = Arrangement.spacedBy(56.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            NeuSample("SQUARE") {
-                Box(Modifier.size(110.dp).neumorphic(cornerRadius = 22.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(64.dp)) {
+                NeuSample("FLAT") {
+                    Box(Modifier.size(110.dp).neumorphic(cornerRadius = 22.dp))
+                }
+                NeuSample("CONCAVE") {
+                    Box(Modifier.size(110.dp).neumorphic(cornerRadius = 55.dp, curve = -0.075f))
+                }
             }
-            NeuSample("CIRCLE") {
-                Box(Modifier.size(110.dp).neumorphic(cornerRadius = 55.dp))
+            NeuSample("CONCAVE") {
+                Box(Modifier.size(110.dp).neumorphic(cornerRadius = 22.dp, curve = -0.075f))
             }
         }
     }
