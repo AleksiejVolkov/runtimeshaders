@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.clickable
@@ -29,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
@@ -50,9 +51,13 @@ import androidx.core.view.WindowCompat
 @Composable
 fun NeuSurface(
     modifier: Modifier = Modifier,
+    dark: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    LightStatusBar()
+    StatusBarIcons(darkIcons = !dark)
+    // the theme is just a different set of colors: animate between the two palettes
+    val theme by animateFloatAsState(if (dark) 1f else 0f, tween(durationMillis = 700), label = "theme")
+    val palette = remember { derivedStateOf { lerp(LightPalette, DarkPalette, theme) } }
     // the light follows the finger and springs back when it's released
     var target by remember { mutableStateOf(DefaultLight) }
     val light = animateOffsetAsState(
@@ -60,11 +65,11 @@ fun NeuSurface(
         animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow),
         label = "light"
     )
-    CompositionLocalProvider(LocalLightDirection provides light) {
+    CompositionLocalProvider(LocalLightDirection provides light, LocalNeuPalette provides palette) {
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(NeuColors.Base)
+                .drawBehind { drawRect(palette.value.base) }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         // Initial pass: we only watch the finger, buttons still get their clicks
@@ -110,7 +115,7 @@ fun NeumorphismThermostatScreen() {
     var nightMode by remember { mutableStateOf(false) }
     var ecoMode by remember { mutableStateOf(true) }
 
-    NeuSurface {
+    NeuSurface(dark = nightMode) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -118,8 +123,8 @@ fun NeumorphismThermostatScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(Modifier.fillMaxWidth()) {
-                Text("Living room", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = NeuColors.Text)
-                Text("Heating · 4 devices", fontSize = 14.sp, color = NeuColors.Hint)
+                Text("Living room", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = neuColors().text)
+                Text("Heating · 4 devices", fontSize = 14.sp, color = neuColors().hint)
             }
             Spacer(Modifier.height(56.dp))
 
@@ -131,8 +136,8 @@ fun NeumorphismThermostatScreen() {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$target°", fontSize = 64.sp, fontWeight = FontWeight.Light, color = NeuColors.Text)
-                    Text("target", fontSize = 13.sp, color = NeuColors.Hint)
+                    Text("$target°", fontSize = 64.sp, fontWeight = FontWeight.Light, color = neuColors().text)
+                    Text("target", fontSize = 13.sp, color = neuColors().hint)
                 }
             }
             Spacer(Modifier.height(48.dp))
@@ -148,15 +153,16 @@ fun NeumorphismThermostatScreen() {
             Spacer(Modifier.height(56.dp))
 
             // flat cards with toggles
-            NeuSettingCard("Night mode", "Dim the lights after 22:00", nightMode) { nightMode = it }
+            NeuSettingCard("Night mode", "Dark theme for late hours", nightMode) { nightMode = it }
             Spacer(Modifier.height(24.dp))
             NeuSettingCard("Eco mode", "Keep 19° while nobody is home", ecoMode) { ecoMode = it }
         }
     }
 }
 
-// the icon goes darker while the button is pressed in
-private fun iconColor(pressed: Boolean) = if (pressed) NeuColors.Text else NeuColors.Hint
+// the icon gets more contrast while the button is pressed in
+@Composable
+private fun iconColor(pressed: Boolean) = if (pressed) neuColors().text else neuColors().hint
 
 @Composable
 private fun NeuSettingCard(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
@@ -169,8 +175,8 @@ private fun NeuSettingCard(title: String, subtitle: String, checked: Boolean, on
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = NeuColors.Text)
-            Text(subtitle, fontSize = 13.sp, color = NeuColors.Hint)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = neuColors().text)
+            Text(subtitle, fontSize = 13.sp, color = neuColors().hint)
         }
         NeuToggle(checked = checked, onCheckedChange = onChange)
     }
@@ -204,20 +210,20 @@ private fun NeuSample(label: String, content: @Composable () -> Unit) {
             fontSize = 12.sp,
             letterSpacing = 3.sp,
             fontWeight = FontWeight.SemiBold,
-            color = NeuColors.Hint
+            color = neuColors().hint
         )
     }
 }
 
-// the material is light, so the status bar icons have to be dark
+// a light material needs dark status bar icons, and the other way round
 @Composable
-private fun LightStatusBar() {
+private fun StatusBarIcons(darkIcons: Boolean) {
     val view = LocalView.current
-    DisposableEffect(view) {
+    DisposableEffect(view, darkIcons) {
         val window = view.context.findActivity()?.window ?: return@DisposableEffect onDispose {}
         val controller = WindowCompat.getInsetsController(window, view)
         val before = controller.isAppearanceLightStatusBars
-        controller.isAppearanceLightStatusBars = true
+        controller.isAppearanceLightStatusBars = darkIcons
         onDispose { controller.isAppearanceLightStatusBars = before }
     }
 }

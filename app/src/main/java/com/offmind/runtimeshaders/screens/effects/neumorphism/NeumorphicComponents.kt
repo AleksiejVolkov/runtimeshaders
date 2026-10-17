@@ -74,7 +74,7 @@ fun NeuToggle(
                 .align(Alignment.CenterStart)
                 .padding(start = 9.dp)
                 .size(8.dp)
-                .background(lerp(NeuColors.Base, NeuColors.Accent, t), CircleShape)
+                .background(lerp(neuColors().base, NeuColors.Accent, t), CircleShape)
         )
         Box(
             modifier = Modifier

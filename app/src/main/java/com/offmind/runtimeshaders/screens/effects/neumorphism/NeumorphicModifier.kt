@@ -1,6 +1,8 @@
 package com.offmind.runtimeshaders.screens.effects.neumorphism
 
 import android.graphics.RuntimeShader
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,6 +15,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.minDimension
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,35 @@ object NeuColors {
     val Accent = Color(0xFF3BD37A)  // status LED
 }
 
+// the same five colors for each theme; the shader doesn't care which one it gets
+@Immutable
+data class NeuPalette(val base: Color, val dark: Color, val light: Color, val text: Color, val hint: Color)
+
+val LightPalette = NeuPalette(NeuColors.Base, NeuColors.Dark, NeuColors.Light, NeuColors.Text, NeuColors.Hint)
+
+// in the dark, the highlight can't be white: it's just a slightly lighter base
+val DarkPalette = NeuPalette(
+    base = Color(0xFF2B2F36),
+    dark = Color(0xFF16181C),
+    light = Color(0xFF3C414B),
+    text = Color(0xFFD5DAE3),
+    hint = Color(0xFF7D8696),
+)
+
+fun lerp(a: NeuPalette, b: NeuPalette, t: Float) = NeuPalette(
+    base = lerp(a.base, b.base, t),
+    dark = lerp(a.dark, b.dark, t),
+    light = lerp(a.light, b.light, t),
+    text = lerp(a.text, b.text, t),
+    hint = lerp(a.hint, b.hint, t),
+)
+
+// a State again, so switching the theme only redraws the elements
+val LocalNeuPalette = staticCompositionLocalOf<State<NeuPalette>> { mutableStateOf(LightPalette) }
+
+@Composable
+fun neuColors(): NeuPalette = LocalNeuPalette.current.value
+
 // one light for the whole screen: a unit vector pointing towards it (screen space, y goes down).
 // It's a State, so a moving light only redraws the elements, without recomposition.
 val DefaultLight = Offset(-0.7071f, -0.7071f)
@@ -41,10 +73,12 @@ fun Modifier.neumorphic(
     blur: Dp = 16.dp,
 ): Modifier = composed {
     val light = LocalLightDirection.current
+    val palette = LocalNeuPalette.current
     val shader = remember { RuntimeShader(neumorphicShader) }
     val brush = remember { ShaderBrush(shader) }
     drawBehind {
         val l = light.value          // <-- read here, inside the draw phase
+        val c = palette.value
         // shadows live outside of the element: they can't go further than shift + blur
         val margin = (distance + blur).toPx() + 2f
         shader.setFloatUniform("size", size.width, size.height)
@@ -54,9 +88,9 @@ fun Modifier.neumorphic(
         shader.setFloatUniform("shadowBlur", blur.toPx())
         shader.setFloatUniform("curve", curve)
         shader.setFloatUniform("press", press)
-        shader.setColorUniform("baseColor", NeuColors.Base.toArgb())
-        shader.setColorUniform("darkColor", NeuColors.Dark.toArgb())
-        shader.setColorUniform("lightColor", NeuColors.Light.toArgb())
+        shader.setColorUniform("baseColor", c.base.toArgb())
+        shader.setColorUniform("darkColor", c.dark.toArgb())
+        shader.setColorUniform("lightColor", c.light.toArgb())
         drawRect(
             brush = brush,
             topLeft = Offset(-margin, -margin),
