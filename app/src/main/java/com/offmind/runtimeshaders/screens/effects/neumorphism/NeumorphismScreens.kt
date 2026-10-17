@@ -139,10 +139,10 @@ fun NeumorphismThermostatScreen() {
 
             Row(horizontalArrangement = Arrangement.spacedBy(56.dp)) {
                 NeuButton(onClick = { target-- }) { pressed ->
-                    Text("\u2212", fontSize = 32.sp, color = NeuColors.Hint)
+                    Text("\u2212", fontSize = 32.sp, color = iconColor(pressed))
                 }
                 NeuButton(onClick = { target++ }) { pressed ->
-                    Text("+", fontSize = 32.sp, color = NeuColors.Hint)
+                    Text("+", fontSize = 32.sp, color = iconColor(pressed))
                 }
             }
             Spacer(Modifier.height(56.dp))
@@ -154,6 +154,9 @@ fun NeumorphismThermostatScreen() {
         }
     }
 }
+
+// the icon goes darker while the button is pressed in
+private fun iconColor(pressed: Boolean) = if (pressed) NeuColors.Text else NeuColors.Hint
 
 @Composable
 private fun NeuSettingCard(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
