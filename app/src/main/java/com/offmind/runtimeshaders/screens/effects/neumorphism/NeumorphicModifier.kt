@@ -23,6 +23,7 @@ object NeuColors {
     val Light = Color(0xFFFFFFFF)   // highlight, towards the light
     val Text = Color(0xFF4A5368)
     val Hint = Color(0xFF9AA4B5)
+    val Accent = Color(0xFF3BD37A)  // status LED
 }
 
 // one light for the whole screen: a unit vector pointing towards it (screen space, y goes down)

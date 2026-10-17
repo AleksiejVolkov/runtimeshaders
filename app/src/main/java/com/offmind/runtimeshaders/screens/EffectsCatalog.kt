@@ -12,6 +12,14 @@ internal val effectsCatalog = listOf(
         )
     ),
     EffectScreenData(
+        title = "Neumorphism · thermostat",
+        description = "A real screen where every element is one material",
+        screenRoute = Route.NeumorphismThermostat(
+            "Neumorphism · thermostat",
+            "A real screen where every element is one material"
+        )
+    ),
+    EffectScreenData(
         title = "Burn After Reading",
         description = "A note that burns away from the long-press point",
         screenRoute = Route.BurnAfterReading(
