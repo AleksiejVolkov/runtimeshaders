@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
@@ -16,6 +17,8 @@ enum class TrackShape { Ring, Bar }
 
 fun Modifier.accentTrack(
     shape: TrackShape,
+    progress: Float,          // how much of the track is filled, 0..1
+    accent: Color,
     thickness: Dp = 18.dp,
     startDeg: Float = 0f,     // ring only: where the track starts, 0 = top, clockwise
     sweepDeg: Float = 360f,   // ring only: how much of the circle the track takes
@@ -32,6 +35,8 @@ fun Modifier.accentTrack(
         shader.setFloatUniform("thickness", thickness.toPx())
         shader.setFloatUniform("startAngle", Math.toRadians(startDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(sweepDeg.toDouble()).toFloat())
+        shader.setFloatUniform("progress", progress.coerceIn(0f, 1f))
+        shader.setColorUniform("accentA", accent.toArgb())
         shader.setFloatUniform("lightDir", l.x, l.y)
         shader.setFloatUniform("shadowShift", 3.dp.toPx())
         shader.setFloatUniform("shadowBlur", 5.dp.toPx())
@@ -49,6 +54,8 @@ private val accentShader = """
     uniform float thickness;      // width of the groove, px
     uniform float startAngle;     // ring: where the track starts, radians, 0 = top
     uniform float sweep;          // ring: how much of the circle it takes, radians
+    uniform float progress;       // filled part of the track, 0..1
+    layout(color) uniform half4 accentA;
     uniform float2 lightDir;
     uniform float shadowShift;
     uniform float shadowBlur;
@@ -95,6 +102,15 @@ private val accentShader = """
         return SegmentSdf(q, BarStart(), BarEnd()) - r;
     }
 
+    // the fill is the same shape, shorter and a bit thinner: it lies at the bottom of the groove
+    float Fill(float2 p) {
+        float2 q = p - size * 0.5;
+        float r = thickness * 0.3;
+        if (kind < 0.5) return ArcSdf(q, Radius(), r, startAngle, sweep * progress);
+        float2 a = BarStart();
+        return SegmentSdf(q, a, mix(a, BarEnd(), progress)) - r;
+    }
+
     float Soft(float d, float blur) {
         return 1.0 - smoothstep(-blur, blur, d);
     }
@@ -109,6 +125,10 @@ private val accentShader = """
         half3 col = baseColor.rgb;
         col = mix(col, darkColor.rgb, innerDark * 0.75);
         col = mix(col, lightColor.rgb, innerLite * 0.8);
+
+        // the accent: paint it on top, just to see the shape
+        float fill = 1.0 - smoothstep(-0.75, 0.75, Fill(p));
+        col = mix(col, accentA.rgb, fill);
 
         return half4(col, 1.0) * inside;
     }

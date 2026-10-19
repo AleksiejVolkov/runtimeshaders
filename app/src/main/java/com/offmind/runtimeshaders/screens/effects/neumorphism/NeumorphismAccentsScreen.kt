@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +52,7 @@ private fun FocusTimer() {
     Box(
         modifier = Modifier
             .size(224.dp)
-            .accentTrack(TrackShape.Ring, thickness = 16.dp),
+            .accentTrack(TrackShape.Ring, progress = 0.75f, accent = Pink, thickness = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -75,7 +76,10 @@ private fun VolumeCard() {
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .accentTrack(TrackShape.Ring, thickness = 12.dp, startDeg = 225f, sweepDeg = 270f),
+                .accentTrack(
+                    TrackShape.Ring, progress = 0.62f, accent = Cyan,
+                    thickness = 12.dp, startDeg = 225f, sweepDeg = 270f
+                ),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -98,7 +102,7 @@ private fun LampCard() {
         Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 140.dp)
-                .accentTrack(TrackShape.Bar, thickness = 44.dp)
+                .accentTrack(TrackShape.Bar, progress = 0.7f, accent = Amber, thickness = 44.dp)
         )
         CardLabel("Lamp")
     }
@@ -128,7 +132,7 @@ private fun DownloadCard() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(18.dp)
-                .accentTrack(TrackShape.Bar, thickness = 18.dp)
+                .accentTrack(TrackShape.Bar, progress = 0.64f, accent = Mint, thickness = 18.dp)
         )
     }
 }
@@ -146,6 +150,12 @@ private fun WidgetCard(modifier: Modifier, content: @Composable () -> Unit) {
         content()
     }
 }
+
+// one accent per widget
+private val Pink = Color(0xFFFF2D7A)
+private val Cyan = Color(0xFF2FE6FF)
+private val Amber = Color(0xFFFFB13B)
+private val Mint = Color(0xFF3BE38A)
 
 @Composable
 private fun CardLabel(text: String) {
