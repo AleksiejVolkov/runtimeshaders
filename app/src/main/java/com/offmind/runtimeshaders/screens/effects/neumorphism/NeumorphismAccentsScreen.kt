@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +79,8 @@ private fun FocusTimer() {
     LaunchedEffect(Unit) {
         left.animateTo(0f, tween(durationMillis = (left.value * 1000).toInt(), easing = LinearEasing))
     }
-    val seconds = left.value.toInt()
+    // the text needs a new value once a second, the ring reads left.value on every frame itself
+    val seconds by remember { derivedStateOf { left.value.toInt() } }
     Box(
         modifier = Modifier
             .size(224.dp)
