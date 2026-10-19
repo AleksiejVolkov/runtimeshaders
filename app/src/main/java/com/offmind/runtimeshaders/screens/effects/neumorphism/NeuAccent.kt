@@ -147,9 +147,24 @@ private val accentShader = """
         col = mix(col, lightColor.rgb, innerLite * 0.8);
 
         // the accent: the gradient follows the track
-        float fill = 1.0 - smoothstep(-0.75, 0.75, Fill(p));
+        float f = Fill(p);
+        float fill = 1.0 - smoothstep(-0.75, 0.75, f);
         half3 accent = mix(accentA.rgb, accentB.rgb, Along(p));
-        col = mix(col, accent, fill);
+
+        // the fill is a tube of light: its own normal comes from the distance to its center line
+        float r = thickness * 0.3;
+        float h = clamp(-f / r, 0.0, 1.0);                     // 0 on the edge, 1 in the middle
+        float3 L = normalize(float3(lightDir * 0.6, 0.8));
+        float2 g = normalize(float2(Fill(p + float2(1.0, 0.0)) - Fill(p - float2(1.0, 0.0)),
+                                    Fill(p + float2(0.0, 1.0)) - Fill(p - float2(0.0, 1.0))) + 1e-4);
+        float3 n = normalize(float3(g * (1.0 - h), sqrt(max(h * (2.0 - h), 0.0))));
+        float sheen = pow(max(dot(n, L), 0.0), 24.0);
+        half3 tube = accent * (0.75 + 0.35 * n.z) + sheen * 0.45;
+        col = mix(col, tube, fill);
+
+        // and the light leaks out of it: the groove around the fill picks up its color
+        float glow = exp(-max(f, 0.0) / (thickness * 0.35)) * (1.0 - fill);
+        col += accent * glow * 0.32;
 
         return half4(col, 1.0) * inside;
     }
