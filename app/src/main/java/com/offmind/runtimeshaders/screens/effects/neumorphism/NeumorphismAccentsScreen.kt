@@ -117,7 +117,9 @@ private fun VolumeCard() {
                     thickness = 12.dp, startDeg = 225f, sweepDeg = 270f
                 )
                 .pointerInput(Unit) {
-                    detectVerticalDragGestures { _, dy -> volume = (volume - dy / 900f).coerceIn(0f, 1f) }
+                    detectVerticalDragGestures { _, dy ->
+                        volume = (volume - dy / 900f).coerceIn(0f, 1f)
+                    }
                 },
             contentAlignment = Alignment.Center
         ) {

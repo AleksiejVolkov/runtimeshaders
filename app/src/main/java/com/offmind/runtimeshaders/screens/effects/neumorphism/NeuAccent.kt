@@ -181,7 +181,8 @@ private val accentShader = """
 
         // a soft pulse runs from the start of the fill to its head
         float t = Along(p);
-        float pulse = exp(-pow((t - fract(time * 0.35) * progress * 1.3) * 9.0 / max(progress, 0.05), 2.0));
+        float pulsePos = fract(time * 0.35) * progress * 1.3;   // runs a bit past the head, then again
+        float pulse = exp(-pow((t - pulsePos) * 9.0 / max(progress, 0.05), 2.0));
         tube += accent * pulse * 0.35 * n.z;
 
         // the head of the fill is the hottest point
