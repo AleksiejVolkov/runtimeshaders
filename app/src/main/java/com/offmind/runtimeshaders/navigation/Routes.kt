@@ -63,4 +63,7 @@ sealed class Route : NavKey {
 
     @Serializable
     data class NeumorphismThermostat(val title: String, val description: String) : Route()
+
+    @Serializable
+    data class NeumorphismAccents(val title: String, val description: String) : Route()
 }

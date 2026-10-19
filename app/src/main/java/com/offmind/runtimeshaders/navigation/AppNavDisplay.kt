@@ -47,6 +47,7 @@ import com.offmind.runtimeshaders.screens.SettingsScreen
 import com.offmind.runtimeshaders.screens.effects.BurnAfterReadingScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
+import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
 import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
 import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
 import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
@@ -216,6 +217,7 @@ private fun routeEntryProvider(callbacks: RouteCallbacks): (NavKey) -> NavEntry<
         routeContentEntry<Route.BurnAfterReading>(callbacks)
         routeContentEntry<Route.NeumorphismBasics>(callbacks)
         routeContentEntry<Route.NeumorphismThermostat>(callbacks)
+        routeContentEntry<Route.NeumorphismAccents>(callbacks)
     }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
@@ -277,5 +279,6 @@ internal fun RouteContent(
         is Route.BurnAfterReading -> BurnAfterReadingScreen()
         is Route.NeumorphismBasics -> NeumorphismBasicsScreen()
         is Route.NeumorphismThermostat -> NeumorphismThermostatScreen()
+        is Route.NeumorphismAccents -> NeumorphismAccentsScreen()
     }
 }
