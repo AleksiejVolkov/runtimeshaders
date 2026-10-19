@@ -189,9 +189,10 @@ private val accentShader = """
         tube += half3(1.0) * head * 0.25 * n.z;
         col = mix(col, tube, fill);
 
-        // and the light leaks out of it: the groove around the fill picks up its color
+        // and the light leaks out of it: the groove around the fill picks up its color.
+        // mix, not add: on a light material adding light just burns it to white
         float glow = exp(-max(f, 0.0) / (thickness * 0.35)) * (1.0 - fill);
-        col += accent * glow * 0.32;
+        col = mix(col, accent, glow * 0.4);
 
         return half4(col, 1.0) * inside;
     }

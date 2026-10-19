@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,16 +36,26 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun NeumorphismAccentsScreen() {
-    NeuSurface(dark = true) {
+    var dark by remember { mutableStateOf(true) }
+    NeuSurface(dark = dark) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 28.dp, vertical = 60.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(Modifier.fillMaxWidth()) {
-                Text("Evening", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = neuColors().text)
-                Text("focus · sound · light · sync", fontSize = 14.sp, color = neuColors().hint)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (dark) "Evening" else "Morning",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = neuColors().text
+                    )
+                    Text("focus · sound · light · sync", fontSize = 14.sp, color = neuColors().hint)
+                }
+                // the same toggle as in the thermostat: here it switches the material itself
+                NeuToggle(checked = dark, onCheckedChange = { dark = it })
             }
             Spacer(Modifier.height(36.dp))
             FocusTimer()
