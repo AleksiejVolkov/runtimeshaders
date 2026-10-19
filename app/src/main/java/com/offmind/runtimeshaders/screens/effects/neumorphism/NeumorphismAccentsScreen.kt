@@ -1,5 +1,12 @@
 package com.offmind.runtimeshaders.screens.effects.neumorphism
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +20,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,10 +62,16 @@ fun NeumorphismAccentsScreen() {
 // a ring groove around a concave button with the time in it
 @Composable
 private fun FocusTimer() {
+    // a 25-minute focus session that started 6 minutes ago; one real second per second
+    val left = remember { Animatable(19f * 60f) }
+    LaunchedEffect(Unit) {
+        left.animateTo(0f, tween(durationMillis = (left.value * 1000).toInt(), easing = LinearEasing))
+    }
+    val seconds = left.value.toInt()
     Box(
         modifier = Modifier
             .size(224.dp)
-            .accentTrack(TrackShape.Ring, progress = 0.75f, colors = Focus, thickness = 16.dp),
+            .accentTrack(TrackShape.Ring, { left.value / (25f * 60f) }, Focus, thickness = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -62,7 +81,12 @@ private fun FocusTimer() {
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("18:42", fontSize = 40.sp, fontWeight = FontWeight.Light, color = neuColors().text)
+                Text(
+                    "%02d:%02d".format(seconds / 60, seconds % 60),
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Light,
+                    color = neuColors().text
+                )
                 Text("focus", fontSize = 13.sp, color = neuColors().hint)
             }
         }
@@ -72,14 +96,18 @@ private fun FocusTimer() {
 // a 270° gauge around a concave knob
 @Composable
 private fun VolumeCard() {
+    var volume by remember { mutableFloatStateOf(0.62f) }
     WidgetCard(Modifier.width(196.dp)) {
         Box(
             modifier = Modifier
                 .size(140.dp)
                 .accentTrack(
-                    TrackShape.Ring, progress = 0.62f, colors = Sound,
+                    TrackShape.Ring, { volume }, Sound,
                     thickness = 12.dp, startDeg = 225f, sweepDeg = 270f
-                ),
+                )
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { _, dy -> volume = (volume - dy / 900f).coerceIn(0f, 1f) }
+                },
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -88,7 +116,12 @@ private fun VolumeCard() {
                     .neumorphic(cornerRadius = 46.dp, curve = -0.075f, distance = 7.dp, blur = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("62", fontSize = 26.sp, fontWeight = FontWeight.Light, color = neuColors().text)
+                Text(
+                    "${(volume * 100).toInt()}",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Light,
+                    color = neuColors().text
+                )
             }
         }
         CardLabel("Volume")
@@ -98,11 +131,17 @@ private fun VolumeCard() {
 // a tall capsule groove: the dimmer
 @Composable
 private fun LampCard() {
+    var level by remember { mutableFloatStateOf(0.7f) }
     WidgetCard(Modifier.width(140.dp)) {
         Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 140.dp)
-                .accentTrack(TrackShape.Bar, progress = 0.7f, colors = Warm, thickness = 44.dp)
+                .accentTrack(TrackShape.Bar, { level }, Warm, thickness = 44.dp)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { _, dy ->
+                        level = (level - dy / size.height).coerceIn(0f, 1f)
+                    }
+                }
         )
         CardLabel("Lamp")
     }
@@ -111,6 +150,13 @@ private fun LampCard() {
 // a wide capsule groove: the download
 @Composable
 private fun DownloadCard() {
+    val transition = rememberInfiniteTransition(label = "download")
+    val done by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 9000, easing = LinearEasing)),
+        label = "done"
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -125,14 +171,14 @@ private fun DownloadCard() {
                 fontWeight = FontWeight.Medium,
                 color = neuColors().text
             )
-            Text("64%", fontSize = 15.sp, color = neuColors().hint)
+            Text("${(done * 100).toInt()}%", fontSize = 15.sp, color = neuColors().hint)
         }
         Spacer(Modifier.height(14.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(18.dp)
-                .accentTrack(TrackShape.Bar, progress = 0.64f, colors = Sync, thickness = 18.dp)
+                .accentTrack(TrackShape.Bar, { done }, Sync, thickness = 18.dp)
         )
     }
 }

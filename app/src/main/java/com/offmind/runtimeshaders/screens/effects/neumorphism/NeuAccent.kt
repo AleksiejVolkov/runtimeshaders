@@ -1,7 +1,12 @@
 package com.offmind.runtimeshaders.screens.effects.neumorphism
 
 import android.graphics.RuntimeShader
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
@@ -17,7 +22,7 @@ enum class TrackShape { Ring, Bar }
 
 fun Modifier.accentTrack(
     shape: TrackShape,
-    progress: Float,          // how much of the track is filled, 0..1
+    progress: () -> Float,    // how much of the track is filled, 0..1; read in the draw phase
     colors: Pair<Color, Color>,   // accent at the start and at the end of the track
     thickness: Dp = 18.dp,
     startDeg: Float = 0f,     // ring only: where the track starts, 0 = top, clockwise
@@ -27,6 +32,7 @@ fun Modifier.accentTrack(
     val palette = LocalNeuPalette.current
     val shader = remember { RuntimeShader(accentShader) }
     val brush = remember { ShaderBrush(shader) }
+    val time = rememberAccentTime()
     drawBehind {
         val l = light.value
         val c = palette.value
@@ -35,7 +41,8 @@ fun Modifier.accentTrack(
         shader.setFloatUniform("thickness", thickness.toPx())
         shader.setFloatUniform("startAngle", Math.toRadians(startDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(sweepDeg.toDouble()).toFloat())
-        shader.setFloatUniform("progress", progress.coerceIn(0f, 1f))
+        shader.setFloatUniform("progress", progress().coerceIn(0f, 1f))
+        shader.setFloatUniform("time", time.value)
         shader.setColorUniform("accentA", colors.first.toArgb())
         shader.setColorUniform("accentB", colors.second.toArgb())
         shader.setFloatUniform("lightDir", l.x, l.y)
@@ -48,6 +55,16 @@ fun Modifier.accentTrack(
     }
 }
 
+@Composable
+private fun rememberAccentTime(): State<Float> {
+    val time = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = withFrameNanos { it }
+        while (true) withFrameNanos { time.floatValue = (it - start) / 1_000_000_000f }
+    }
+    return time
+}
+
 @Language("AGSL")
 private val accentShader = """
     uniform float2 size;
@@ -56,6 +73,7 @@ private val accentShader = """
     uniform float startAngle;     // ring: where the track starts, radians, 0 = top
     uniform float sweep;          // ring: how much of the circle it takes, radians
     uniform float progress;       // filled part of the track, 0..1
+    uniform float time;           // seconds, for the light running along the fill
     layout(color) uniform half4 accentA;
     layout(color) uniform half4 accentB;
     uniform float2 lightDir;
@@ -160,6 +178,15 @@ private val accentShader = """
         float3 n = normalize(float3(g * (1.0 - h), sqrt(max(h * (2.0 - h), 0.0))));
         float sheen = pow(max(dot(n, L), 0.0), 24.0);
         half3 tube = accent * (0.75 + 0.35 * n.z) + sheen * 0.45;
+
+        // a soft pulse runs from the start of the fill to its head
+        float t = Along(p);
+        float pulse = exp(-pow((t - fract(time * 0.35) * progress * 1.3) * 9.0 / max(progress, 0.05), 2.0));
+        tube += accent * pulse * 0.35 * n.z;
+
+        // the head of the fill is the hottest point
+        float head = exp(-pow((t - progress) * 14.0, 2.0));
+        tube += half3(1.0) * head * 0.25 * n.z;
         col = mix(col, tube, fill);
 
         // and the light leaks out of it: the groove around the fill picks up its color
