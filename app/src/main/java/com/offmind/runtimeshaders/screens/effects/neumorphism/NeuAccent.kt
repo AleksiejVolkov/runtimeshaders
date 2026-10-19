@@ -18,7 +18,7 @@ enum class TrackShape { Ring, Bar }
 fun Modifier.accentTrack(
     shape: TrackShape,
     progress: Float,          // how much of the track is filled, 0..1
-    accent: Color,
+    colors: Pair<Color, Color>,   // accent at the start and at the end of the track
     thickness: Dp = 18.dp,
     startDeg: Float = 0f,     // ring only: where the track starts, 0 = top, clockwise
     sweepDeg: Float = 360f,   // ring only: how much of the circle the track takes
@@ -36,7 +36,8 @@ fun Modifier.accentTrack(
         shader.setFloatUniform("startAngle", Math.toRadians(startDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(sweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("progress", progress.coerceIn(0f, 1f))
-        shader.setColorUniform("accentA", accent.toArgb())
+        shader.setColorUniform("accentA", colors.first.toArgb())
+        shader.setColorUniform("accentB", colors.second.toArgb())
         shader.setFloatUniform("lightDir", l.x, l.y)
         shader.setFloatUniform("shadowShift", 3.dp.toPx())
         shader.setFloatUniform("shadowBlur", 5.dp.toPx())
@@ -56,6 +57,7 @@ private val accentShader = """
     uniform float sweep;          // ring: how much of the circle it takes, radians
     uniform float progress;       // filled part of the track, 0..1
     layout(color) uniform half4 accentA;
+    layout(color) uniform half4 accentB;
     uniform float2 lightDir;
     uniform float shadowShift;
     uniform float shadowBlur;
@@ -111,6 +113,24 @@ private val accentShader = """
         return SegmentSdf(q, a, mix(a, BarEnd(), progress)) - r;
     }
 
+    // where along the track a point is, 0..1: the color depends on it, not on x or y
+    float Along(float2 p) {
+        float2 q = p - size * 0.5;
+        if (kind < 0.5) {
+            float len = sweep * progress;
+            float u = mod(Angle(q) - startAngle + TAU, TAU);
+            if (u > len) {
+                // in the round caps: take the closest end of the fill
+                float2 p0 = Radius() * float2(sin(startAngle), -cos(startAngle));
+                float2 p1 = Radius() * float2(sin(startAngle + len), -cos(startAngle + len));
+                u = length(q - p0) < length(q - p1) ? 0.0 : len;
+            }
+            return u / sweep;
+        }
+        float2 a = BarStart(), b = BarEnd();
+        return clamp(dot(q - a, b - a) / dot(b - a, b - a), 0.0, 1.0);
+    }
+
     float Soft(float d, float blur) {
         return 1.0 - smoothstep(-blur, blur, d);
     }
@@ -126,9 +146,10 @@ private val accentShader = """
         col = mix(col, darkColor.rgb, innerDark * 0.75);
         col = mix(col, lightColor.rgb, innerLite * 0.8);
 
-        // the accent: paint it on top, just to see the shape
+        // the accent: the gradient follows the track
         float fill = 1.0 - smoothstep(-0.75, 0.75, Fill(p));
-        col = mix(col, accentA.rgb, fill);
+        half3 accent = mix(accentA.rgb, accentB.rgb, Along(p));
+        col = mix(col, accent, fill);
 
         return half4(col, 1.0) * inside;
     }

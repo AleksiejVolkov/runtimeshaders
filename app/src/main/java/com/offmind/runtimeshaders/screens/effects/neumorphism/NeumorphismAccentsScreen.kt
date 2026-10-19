@@ -52,7 +52,7 @@ private fun FocusTimer() {
     Box(
         modifier = Modifier
             .size(224.dp)
-            .accentTrack(TrackShape.Ring, progress = 0.75f, accent = Pink, thickness = 16.dp),
+            .accentTrack(TrackShape.Ring, progress = 0.75f, colors = Focus, thickness = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -77,7 +77,7 @@ private fun VolumeCard() {
             modifier = Modifier
                 .size(140.dp)
                 .accentTrack(
-                    TrackShape.Ring, progress = 0.62f, accent = Cyan,
+                    TrackShape.Ring, progress = 0.62f, colors = Sound,
                     thickness = 12.dp, startDeg = 225f, sweepDeg = 270f
                 ),
             contentAlignment = Alignment.Center
@@ -102,7 +102,7 @@ private fun LampCard() {
         Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 140.dp)
-                .accentTrack(TrackShape.Bar, progress = 0.7f, accent = Amber, thickness = 44.dp)
+                .accentTrack(TrackShape.Bar, progress = 0.7f, colors = Warm, thickness = 44.dp)
         )
         CardLabel("Lamp")
     }
@@ -132,7 +132,7 @@ private fun DownloadCard() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(18.dp)
-                .accentTrack(TrackShape.Bar, progress = 0.64f, accent = Mint, thickness = 18.dp)
+                .accentTrack(TrackShape.Bar, progress = 0.64f, colors = Sync, thickness = 18.dp)
         )
     }
 }
@@ -151,11 +151,11 @@ private fun WidgetCard(modifier: Modifier, content: @Composable () -> Unit) {
     }
 }
 
-// one accent per widget
-private val Pink = Color(0xFFFF2D7A)
-private val Cyan = Color(0xFF2FE6FF)
-private val Amber = Color(0xFFFFB13B)
-private val Mint = Color(0xFF3BE38A)
+// one accent per widget: where the track starts and where it ends
+private val Focus = Color(0xFFFF2D7A) to Color(0xFFA25BFF)
+private val Sound = Color(0xFF2FE6FF) to Color(0xFF3D6BFF)
+private val Warm = Color(0xFFFF6A2A) to Color(0xFFFFC94A)
+private val Sync = Color(0xFF21C7C7) to Color(0xFF52F08A)
 
 @Composable
 private fun CardLabel(text: String) {
