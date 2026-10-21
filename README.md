@@ -28,8 +28,10 @@ For the full architecture, file-by-file breakdown, and tech-stack versions, see 
 ## App Appearance
 
 Open **Settings → Appearance** to choose **Neumorphism**, **Glass**, or the original **Classic**
-style. The catalog, nested collections, settings and pickers update immediately. The choice is
-saved between launches independently of the predictive-back effect. Demo screens keep their own
+style. Glass and Neumorphism follow the device's light/dark theme, including their previews and
+system-bar icons; Classic retains its original dark design. The catalog, nested collections,
+settings and pickers update immediately. The choice is saved between launches independently of
+the predictive-back effect. Demo screens keep their own
 design so their materials can still be compared. Shared chrome components in
 `ui/components/AppChrome.kt` reuse the same glass and neumorphic shaders as the widget demos.
 

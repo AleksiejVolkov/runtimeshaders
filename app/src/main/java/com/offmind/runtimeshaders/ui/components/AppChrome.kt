@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -52,13 +53,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.offmind.runtimeshaders.R
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBackdrop
+import com.offmind.runtimeshaders.screens.effects.glass.DayMood
 import com.offmind.runtimeshaders.screens.effects.glass.NightMood
 import com.offmind.runtimeshaders.screens.effects.glass.glass
 import com.offmind.runtimeshaders.screens.effects.neumorphism.LightPalette
+import com.offmind.runtimeshaders.screens.effects.neumorphism.DarkPalette
 import com.offmind.runtimeshaders.screens.effects.neumorphism.LocalNeuPalette
 import com.offmind.runtimeshaders.screens.effects.neumorphism.neumorphic
 import com.offmind.runtimeshaders.ui.theme.AppAppearance
 import com.offmind.runtimeshaders.ui.theme.LocalAppAppearance
+import com.offmind.runtimeshaders.ui.theme.LocalAppDarkTheme
 
 /** Theme only the app's chrome; demo screens keep the materials they are demonstrating. */
 @Composable
@@ -66,20 +70,39 @@ internal fun AppAppearanceTheme(
     appearance: AppAppearance = LocalAppAppearance.current,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = appearance.usesDarkTheme(isSystemInDarkTheme())
+    val neuPalette = if (darkTheme) DarkPalette else LightPalette
+    val glassMood = if (darkTheme) NightMood else DayMood
     val colors = when (appearance) {
-        AppAppearance.Neumorphism -> lightColorScheme(
+        AppAppearance.Neumorphism -> if (darkTheme) darkColorScheme(
+            primary = Color(0xFFA9D8EA),
+            background = neuPalette.base,
+            surface = neuPalette.base,
+            onBackground = neuPalette.text,
+            onSurface = neuPalette.text,
+            onSurfaceVariant = Color(0xFFB2BCCB),
+        ) else lightColorScheme(
             primary = Color(0xFF365F70),
-            background = LightPalette.base,
-            surface = LightPalette.base,
-            onSurface = LightPalette.text,
+            background = neuPalette.base,
+            surface = neuPalette.base,
+            onBackground = neuPalette.text,
+            onSurface = neuPalette.text,
             onSurfaceVariant = Color(0xFF626D80),
         )
-        AppAppearance.Glass -> darkColorScheme(
+        AppAppearance.Glass -> if (darkTheme) darkColorScheme(
             primary = Color(0xFFBEEBF7),
-            background = NightMood.bottom,
-            surface = NightMood.top,
+            background = glassMood.bottom,
+            surface = glassMood.top,
+            onBackground = Color.White,
             onSurface = Color.White,
             onSurfaceVariant = Color(0xFFCFD8E2),
+        ) else lightColorScheme(
+            primary = Color(0xFF1B5871),
+            background = glassMood.bottom,
+            surface = glassMood.top,
+            onBackground = Color(0xFF20364B),
+            onSurface = Color(0xFF20364B),
+            onSurfaceVariant = Color(0xFF435C70),
         )
         AppAppearance.Classic -> darkColorScheme(
             primary = Color(0xFFB3DDF5),
@@ -91,7 +114,8 @@ internal fun AppAppearanceTheme(
     }
     CompositionLocalProvider(
         LocalAppAppearance provides appearance,
-        LocalNeuPalette provides rememberUpdatedState(LightPalette),
+        LocalAppDarkTheme provides darkTheme,
+        LocalNeuPalette provides rememberUpdatedState(neuPalette),
     ) {
         MaterialTheme(colorScheme = colors, content = content)
     }
@@ -130,8 +154,11 @@ internal fun AppBackground(modifier: Modifier = Modifier) {
             )
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.22f)))
         }
-        AppAppearance.Neumorphism -> Box(modifier.background(LightPalette.base))
-        AppAppearance.Glass -> GlassBackdrop(mood = NightMood, modifier = modifier) {}
+        AppAppearance.Neumorphism -> Box(modifier.background(LocalNeuPalette.current.value.base))
+        AppAppearance.Glass -> GlassBackdrop(
+            mood = if (LocalAppDarkTheme.current) NightMood else DayMood,
+            modifier = modifier,
+        ) {}
     }
 }
 
@@ -147,6 +174,7 @@ internal fun AppSurface(
     val pressed by interaction.collectIsPressedAsState()
     val press by animateFloatAsState(if (pressed) 1f else 0f, tween(140), label = "surfacePress")
     val shape = RoundedCornerShape(cornerRadius)
+    val darkTheme = LocalAppDarkTheme.current
     val surface = when (LocalAppAppearance.current) {
         AppAppearance.Classic -> Modifier
             .clip(shape)
@@ -160,8 +188,14 @@ internal fun AppSurface(
         )
         AppAppearance.Glass -> Modifier.glass(
             cornerRadius = cornerRadius,
-            tint = if (selected == true) Color.Black else Color.White,
-            tintAlpha = if (selected == true) 0.2f else 0.10f,
+            tint = when {
+                selected != true -> Color.White
+                darkTheme -> Color.Black
+                else -> MaterialTheme.colorScheme.primary
+            },
+            tintAlpha = if (selected == true) {
+                if (darkTheme) 0.2f else 0.08f
+            } else 0.10f,
             lift = if (selected == true) 0.dp else 5.dp * (1f - press),
             depth = if (selected == true) -1f else 1f - press * 0.65f,
         )

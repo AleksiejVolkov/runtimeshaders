@@ -2,6 +2,7 @@ package com.offmind.runtimeshaders.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -13,7 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.offmind.runtimeshaders.data.AppSettingsRepository
 import com.offmind.runtimeshaders.ui.components.AppSystemBars
-import com.offmind.runtimeshaders.ui.theme.AppAppearance
 import com.offmind.runtimeshaders.ui.theme.LocalAppAppearance
 import kotlinx.coroutines.launch
 
@@ -31,7 +31,7 @@ internal fun RuntimeShadersNavHost() {
 
     val activeRoute = backStack.lastOrNull()
     if (activeRoute !is Route.Effect && activeRoute != Route.NavigationTestFeed) {
-        AppSystemBars(darkIcons = currentSettings.appearance == AppAppearance.Neumorphism)
+        AppSystemBars(darkIcons = !currentSettings.appearance.usesDarkTheme(isSystemInDarkTheme()))
     }
     CompositionLocalProvider(LocalAppAppearance provides currentSettings.appearance) {
         Box(modifier = Modifier.fillMaxSize()) {

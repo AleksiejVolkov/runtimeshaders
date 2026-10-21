@@ -132,6 +132,11 @@ for new app chrome so colors, pressed states and materials follow the selected s
 materials scoped to their screens. The host sets system-bar contrast only for the active chrome
 route, not for background entries or appearance previews.
 
+Glass and Neumorphism follow `isSystemInDarkTheme()` for their background, material palette,
+text and system-bar icons. `AppAppearance.usesDarkTheme` is the shared policy (Classic keeps
+its original dark artwork); `LocalAppDarkTheme` carries the resolved mode into chrome and nested
+previews. Use the provided `LocalNeuPalette`, not a fixed light palette, for neumorphic surfaces.
+
 `AppSettingsRepository` stores appearance and predictive-back choice independently in DataStore.
 It retains the original `back_effect_settings` file and `selected_back_effect` key to preserve
 existing installations. `RuntimeShadersNavHost` waits for the first settings value, then provides

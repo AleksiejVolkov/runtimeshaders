@@ -7,6 +7,9 @@ internal enum class AppAppearance(val id: String, val title: String, val descrip
     Neumorphism("neumorphism", "Neumorphism", "Soft raised surfaces and recessed controls"),
     Glass("glass", "Glass", "Translucent panels with illuminated edges");
 
+    // Classic keeps its original artwork; widget materials follow the device theme.
+    fun usesDarkTheme(systemDarkTheme: Boolean): Boolean = this == Classic || systemDarkTheme
+
     companion object {
         val default = Classic
 
@@ -15,3 +18,6 @@ internal enum class AppAppearance(val id: String, val title: String, val descrip
 }
 
 internal val LocalAppAppearance = staticCompositionLocalOf { AppAppearance.default }
+
+// Resolved per appearance, including nested picker previews.
+internal val LocalAppDarkTheme = staticCompositionLocalOf { true }

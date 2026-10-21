@@ -109,7 +109,8 @@ internal fun AppearancePickerScreen(
         ) {
             item {
                 Text(
-                    "Applies to the catalog and settings. Effect demos keep their own design.",
+                    "Applies to the catalog and settings. Glass and Neumorphism follow your device theme. " +
+                        "Effect demos keep their own design.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )

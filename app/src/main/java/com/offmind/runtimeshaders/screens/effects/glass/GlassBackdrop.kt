@@ -34,6 +34,12 @@ val TealMood = GlassMood(
     spots = listOf(Color(0x66E6F4F7), Color(0x55244A57), Color(0x449FD3DC)),
 )
 
+val DayMood = GlassMood(
+    top = Color(0xFFE7F1F8),
+    bottom = Color(0xFFC4D9E6),
+    spots = listOf(Color(0x88FFFFFF), Color(0x18244A57), Color(0x309FD3DC)),
+)
+
 val NightMood = GlassMood(
     top = Color(0xFF3B3E48),
     bottom = Color(0xFF121317),
