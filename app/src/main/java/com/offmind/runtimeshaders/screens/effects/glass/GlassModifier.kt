@@ -24,8 +24,10 @@ fun Modifier.glass(
     tint: Color = Color.White,
     tintAlpha: Float = 0.10f,   // how much of the body we see: glass is mostly transparent
     edge: Dp = 2.5.dp,          // the rounded edge of the glass: thin, this is where light is caught
+    thickness: Dp = 12.dp,      // how deep the light that went inside comes back out near the edges
     shine: Color = Color.White, // the color of the light reflected by the edges
     light: Offset = GlassLight, // unit vector towards the light, screen space (y goes down)
+    lift: Dp = 10.dp,           // how high the glass floats: moves and softens its shadow
 ): Modifier = composed {
     val shader = remember { RuntimeShader(glassShader) }
     val brush = remember { ShaderBrush(shader) }
@@ -35,9 +37,18 @@ fun Modifier.glass(
         shader.setColorUniform("tint", tint.toArgb())
         shader.setFloatUniform("tintAlpha", tintAlpha)
         shader.setFloatUniform("edge", edge.toPx())
+        shader.setFloatUniform("thickness", thickness.toPx())
         shader.setColorUniform("shine", shine.toArgb())
         shader.setFloatUniform("lightDir", light.x, light.y)
-        drawRect(brush)
+        shader.setFloatUniform("shadowShift", lift.toPx())
+        shader.setFloatUniform("shadowBlur", lift.toPx() * 2.2f)
+        // the shadow lies outside of the element
+        val margin = lift.toPx() * 3.4f + 2f
+        drawRect(
+            brush = brush,
+            topLeft = Offset(-margin, -margin),
+            size = Size(size.width + margin * 2, size.height + margin * 2)
+        )
     }
 }
 
@@ -48,8 +59,11 @@ private val glassShader = """
     layout(color) uniform half4 tint;
     uniform float tintAlpha;
     uniform float edge;               // px, width of the rounded edge
+    uniform float thickness;          // px, how far from the edge the inner light reaches
     layout(color) uniform half4 shine;
     uniform float2 lightDir;
+    uniform float shadowShift;        // px
+    uniform float shadowBlur;         // px
 
     float sdRoundBox(float2 p, float2 halfSize, float r) {
         float2 q = abs(p) - halfSize + r;
@@ -72,6 +86,11 @@ private val glassShader = """
     half4 Over(half4 dst, half3 color, float k) {
         k = clamp(k, 0.0, 1.0);
         return half4(color * k + dst.rgb * (1.0 - k), k + dst.a * (1.0 - k));
+    }
+
+    float Soft(float d, float blur) {
+        blur = max(blur, 1.0);
+        return 1.0 - smoothstep(-blur, blur, d);
     }
 
     half4 main(float2 p) {
@@ -102,11 +121,19 @@ private val glassShader = """
         float along = dot((p - size * 0.5) / max(size.x, size.y), -lightDir);   // -0.5..0.5
         float sky = smoothstep(0.1, -0.5, along) * 0.07;
 
+        // thick glass: light that got inside comes back out near the edges, mostly on the far side
+        float band = exp(d / thickness) * (0.05 + 0.2 * pow(max(-facing, 0.0), 2.0));
+
         // the body: a thin tinted filter over whatever is behind it (premultiplied)
         float a = tintAlpha * inside;
         half4 glass = half4(tint.rgb * a, a);
         // the reflected light lies on top of it
-        glass = Over(glass, shine.rgb, (sky + rim) * inside);
-        return glass;
+        glass = Over(glass, shine.rgb, (sky + rim + band) * inside);
+
+        // glass is a separate object above the backdrop: one soft shadow, away from the light.
+        // It's weaker under the glass itself, because the light goes through it
+        float shadow = Soft(Shape(p + lightDir * shadowShift), shadowBlur) * 0.32;
+        shadow *= (1.0 - inside * 0.7);
+        return glass + half4(0.0, 0.0, 0.0, shadow) * (1.0 - glass.a);
     }
 """.trimIndent()
