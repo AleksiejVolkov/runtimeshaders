@@ -28,6 +28,7 @@ fun Modifier.glass(
     shine: Color = Color.White, // the color of the light reflected by the edges
     light: Offset = GlassLight, // unit vector towards the light, screen space (y goes down)
     lift: Dp = 10.dp,           // how high the glass floats: moves and softens its shadow
+    depth: Float = 1f,          // 1 = a raised piece of glass, -1 = a well cut into it
 ): Modifier = composed {
     val shader = remember { RuntimeShader(glassShader) }
     val brush = remember { ShaderBrush(shader) }
@@ -42,6 +43,7 @@ fun Modifier.glass(
         shader.setFloatUniform("lightDir", light.x, light.y)
         shader.setFloatUniform("shadowShift", lift.toPx())
         shader.setFloatUniform("shadowBlur", lift.toPx() * 2.2f)
+        shader.setFloatUniform("depth", depth)
         // the shadow lies outside of the element
         val margin = lift.toPx() * 3.4f + 2f
         drawRect(
@@ -64,6 +66,7 @@ private val glassShader = """
     uniform float2 lightDir;
     uniform float shadowShift;        // px
     uniform float shadowBlur;         // px
+    uniform float depth;              // 1 = raised, -1 = a well
 
     float sdRoundBox(float2 p, float2 halfSize, float r) {
         float2 q = abs(p) - halfSize + r;
@@ -108,7 +111,8 @@ private val glassShader = """
         float fresnel = pow(1.0 - n.z, 2.0);
 
         // which way this piece of the edge looks: towards the light, or away from it.
-        float facing = dot(EdgeDir(p), lightDir);
+        // A well (depth < 0) is the same edge turned inside out
+        float facing = dot(EdgeDir(p), lightDir) * depth;
 
         // the edge facing the light mirrors it: that's the key highlight. The opposite edge
         // shines too, weaker: light went through the plate and comes out there
@@ -123,17 +127,24 @@ private val glassShader = """
 
         // thick glass: light that got inside comes back out near the edges, mostly on the far side
         float band = exp(d / thickness) * (0.05 + 0.2 * pow(max(-facing, 0.0), 2.0));
+        band *= max(depth, 0.0);
+
+        // a well has a shaded wall on the side of the light, like any dent
+        float well = max(-depth, 0.0);
+        float wallShade = (1.0 - Soft(Shape(p + lightDir * thickness * 0.35), thickness * 0.4))
+                * 0.3 * well;
 
         // the body: a thin tinted filter over whatever is behind it (premultiplied)
         float a = tintAlpha * inside;
         half4 glass = half4(tint.rgb * a, a);
+        glass = Over(glass, half3(0.0), wallShade * inside);
         // the reflected light lies on top of it
-        glass = Over(glass, shine.rgb, (sky + rim + band) * inside);
+        glass = Over(glass, shine.rgb, (sky * max(depth, 0.0) + rim + band) * inside);
 
         // glass is a separate object above the backdrop: one soft shadow, away from the light.
         // It's weaker under the glass itself, because the light goes through it
         float shadow = Soft(Shape(p + lightDir * shadowShift), shadowBlur) * 0.32;
-        shadow *= (1.0 - inside * 0.7);
+        shadow *= (1.0 - inside * 0.7) * max(depth, 0.0);
         return glass + half4(0.0, 0.0, 0.0, shadow) * (1.0 - glass.a);
     }
 """.trimIndent()

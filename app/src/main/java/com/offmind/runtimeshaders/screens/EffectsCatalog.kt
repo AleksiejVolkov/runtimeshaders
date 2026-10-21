@@ -12,6 +12,14 @@ internal val effectsCatalog = listOf(
         )
     ),
     EffectScreenData(
+        title = "Glass · set",
+        description = "A whole component set from one glass shader",
+        screenRoute = Route.GlassSet(
+            "Glass · set",
+            "A whole component set from one glass shader"
+        )
+    ),
+    EffectScreenData(
         title = "Neumorphism · accents",
         description = "Glowing color inside soft UI widgets",
         screenRoute = Route.NeumorphismAccents(

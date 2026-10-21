@@ -49,6 +49,7 @@ import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsS
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
+import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
 import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
 import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
 import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
@@ -220,6 +221,7 @@ private fun routeEntryProvider(callbacks: RouteCallbacks): (NavKey) -> NavEntry<
         routeContentEntry<Route.NeumorphismThermostat>(callbacks)
         routeContentEntry<Route.NeumorphismAccents>(callbacks)
         routeContentEntry<Route.GlassBasics>(callbacks)
+        routeContentEntry<Route.GlassSet>(callbacks)
     }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
@@ -283,5 +285,6 @@ internal fun RouteContent(
         is Route.NeumorphismThermostat -> NeumorphismThermostatScreen()
         is Route.NeumorphismAccents -> NeumorphismAccentsScreen()
         is Route.GlassBasics -> GlassBasicsScreen()
+        is Route.GlassSet -> GlassSetScreen()
     }
 }
