@@ -4,6 +4,14 @@ import com.offmind.runtimeshaders.navigation.Route
 
 internal val effectsCatalog = listOf(
     EffectScreenData(
+        title = "Glass · basics",
+        description = "A pill, a circle and a card: highlights step by step",
+        screenRoute = Route.GlassBasics(
+            "Glass · basics",
+            "A pill, a circle and a card: highlights step by step"
+        )
+    ),
+    EffectScreenData(
         title = "Neumorphism · accents",
         description = "Glowing color inside soft UI widgets",
         screenRoute = Route.NeumorphismAccents(

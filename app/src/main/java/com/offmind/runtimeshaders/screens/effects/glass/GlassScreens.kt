@@ -1,0 +1,72 @@
+package com.offmind.runtimeshaders.screens.effects.glass
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+private val Ink = Color(0xF2FFFFFF)
+private val InkSoft = Color(0xB3FFFFFF)
+
+// three basic pieces of glass: a pill, a circle and a card
+@Composable
+fun GlassBasicsScreen() {
+    GlassBackdrop(TealMood) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(width = 200.dp, height = 68.dp).glass(cornerRadius = 34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Sign In", fontSize = 22.sp, fontWeight = FontWeight.Medium, color = Ink)
+                }
+                Box(
+                    modifier = Modifier.size(68.dp).glass(cornerRadius = 34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, null, Modifier.size(34.dp), tint = Ink)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .glass(cornerRadius = 28.dp)
+                    .padding(24.dp)
+            ) {
+                Text("Glass Interface", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                Text(
+                    "Mostly transparent. Light tells you where it is.",
+                    modifier = Modifier.width(240.dp).padding(top = 8.dp),
+                    fontSize = 14.sp,
+                    color = InkSoft
+                )
+            }
+        }
+    }
+}
