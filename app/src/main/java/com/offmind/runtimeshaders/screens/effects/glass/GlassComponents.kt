@@ -25,12 +25,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -39,6 +44,37 @@ import androidx.compose.ui.unit.sp
 
 val GlassInk = Color(0xF2FFFFFF)
 val GlassInkSoft = Color(0x99FFFFFF)
+
+// A mood of the glass: only colors. The rules (edge, Fresnel, two highlights, shadow) never change
+@Immutable
+data class GlassStyle(val tint: Color, val tintAlpha: Float, val shine: Color, val wellAlpha: Float)
+
+val DayGlass = GlassStyle(Color.White, tintAlpha = 0.10f, shine = Color.White, wellAlpha = 0.16f)
+// at night the body is barely there and the light is a little colder
+val NightGlass = GlassStyle(Color.White, tintAlpha = 0.05f, shine = Color(0xFFDCE4FF), wellAlpha = 0.32f)
+
+fun lerp(a: GlassStyle, b: GlassStyle, t: Float) = GlassStyle(
+    tint = lerp(a.tint, b.tint, t),
+    tintAlpha = lerp(a.tintAlpha, b.tintAlpha, t),
+    shine = lerp(a.shine, b.shine, t),
+    wellAlpha = lerp(a.wellAlpha, b.wellAlpha, t),
+)
+
+val LocalGlassStyle = staticCompositionLocalOf { DayGlass }
+
+// Modifier.glass with the colors of the current mood
+fun Modifier.styledGlass(
+    cornerRadius: Dp,
+    thickness: Dp = 12.dp,
+    lift: Dp = 10.dp,
+    depth: Float = 1f,
+) = composed {
+    val style = LocalGlassStyle.current
+    glass(
+        cornerRadius, style.tint, style.tintAlpha,
+        thickness = thickness, shine = style.shine, lift = lift, depth = depth
+    )
+}
 
 // Everything below is the same modifier with different parameters. Three roles are enough:
 // a raised piece of glass, a pressed one, and a well cut into the glass for "selected".
@@ -62,7 +98,7 @@ fun GlassPressable(
                 scaleX = scale
                 scaleY = scale
             }
-            .glass(cornerRadius, lift = lift, depth = depth)
+            .styledGlass(cornerRadius, lift = lift, depth = depth)
             .clickable(interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
         content = content
@@ -70,8 +106,13 @@ fun GlassPressable(
 }
 
 // a well: the same glass turned inside out, darker, without a shadow of its own
-fun Modifier.glassWell(cornerRadius: Dp) =
-    glass(cornerRadius, tint = Color.Black, tintAlpha = 0.16f, lift = 0.dp, depth = -1f)
+fun Modifier.glassWell(cornerRadius: Dp) = composed {
+    val style = LocalGlassStyle.current
+    glass(
+        cornerRadius, tint = Color.Black, tintAlpha = style.wellAlpha,
+        shine = style.shine, lift = 0.dp, depth = -1f
+    )
+}
 
 @Composable
 fun GlassTabBar(
@@ -83,7 +124,7 @@ fun GlassTabBar(
     BoxWithConstraints(
         modifier = modifier
             .height(76.dp)
-            .glass(cornerRadius = 38.dp)
+            .styledGlass(cornerRadius = 38.dp)
             .padding(6.dp)
     ) {
         val tabWidth = maxWidth / tabs.size
@@ -129,7 +170,7 @@ fun GlassSegmented(
     BoxWithConstraints(
         modifier = modifier
             .height(64.dp)
-            .glass(cornerRadius = 32.dp, thickness = 22.dp)
+            .styledGlass(cornerRadius = 32.dp, thickness = 22.dp)
             .padding(7.dp)
     ) {
         val w = maxWidth / options.size
@@ -166,12 +207,38 @@ fun GlassSearchField(hint: String, icon: ImageVector, modifier: Modifier = Modif
     Row(
         modifier = modifier
             .height(56.dp)
-            .glass(cornerRadius = 28.dp, thickness = 8.dp, lift = 6.dp)
+            .styledGlass(cornerRadius = 28.dp, thickness = 8.dp, lift = 6.dp)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null, Modifier.size(22.dp), tint = GlassInkSoft)
         Text(hint, fontSize = 16.sp, color = GlassInkSoft, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+// a switch: the track is a well, the knob is a small raised piece of glass sliding in it
+@Composable
+fun GlassSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val t by animateFloatAsState(
+        if (checked) 1f else 0f,
+        spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "switch"
+    )
+    Box(
+        modifier = Modifier
+            .size(width = 72.dp, height = 40.dp)
+            .glassWell(cornerRadius = 20.dp)
+            .clickable(remember { MutableInteractionSource() }, indication = null) {
+                onCheckedChange(!checked)
+            }
+            .padding(5.dp)
+    ) {
+        Box(
+            Modifier
+                .offset(x = 32.dp * t)
+                .size(30.dp)
+                .styledGlass(cornerRadius = 15.dp, thickness = 6.dp, lift = 4.dp)
+        )
     }
 }
 
@@ -191,7 +258,7 @@ fun GlassRoundButton(icon: ImageVector, onClick: () -> Unit, size: Dp = 64.dp) {
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier = modifier
-            .glass(cornerRadius = 28.dp, thickness = 16.dp)
+            .styledGlass(cornerRadius = 28.dp, thickness = 16.dp)
             .padding(22.dp)
     ) {
         content()

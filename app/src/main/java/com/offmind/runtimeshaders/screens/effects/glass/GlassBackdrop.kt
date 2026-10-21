@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -31,6 +32,18 @@ val TealMood = GlassMood(
     top = Color(0xFF8FB3BD),
     bottom = Color(0xFF3E5E68),
     spots = listOf(Color(0x66E6F4F7), Color(0x55244A57), Color(0x449FD3DC)),
+)
+
+val NightMood = GlassMood(
+    top = Color(0xFF3B3E48),
+    bottom = Color(0xFF121317),
+    spots = listOf(Color(0x55C9CEDC), Color(0x44000000), Color(0x336B7488)),
+)
+
+fun lerp(a: GlassMood, b: GlassMood, t: Float) = GlassMood(
+    top = lerp(a.top, b.top, t),
+    bottom = lerp(a.bottom, b.bottom, t),
+    spots = a.spots.zip(b.spots) { x, y -> lerp(x, y, t) },
 )
 
 @Composable

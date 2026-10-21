@@ -1,5 +1,9 @@
 package com.offmind.runtimeshaders.screens.effects.glass
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,67 +92,75 @@ fun GlassBasicsScreen() {
 fun GlassSetScreen() {
     var tab by remember { mutableIntStateOf(2) }
     var box by remember { mutableIntStateOf(0) }
-    GlassBackdrop(TealMood) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 72.dp),
-            verticalArrangement = Arrangement.spacedBy(30.dp)
-        ) {
-            Column {
-                Text("Glass", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = GlassInk)
-                Text("one shader · one light", fontSize = 14.sp, color = GlassInkSoft)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
+    var night by remember { mutableStateOf(false) }
+    // the mood is just colors: the backdrop and the glass style move together
+    val t by animateFloatAsState(if (night) 1f else 0f, tween(durationMillis = 900), label = "mood")
+    CompositionLocalProvider(LocalGlassStyle provides lerp(DayGlass, NightGlass, t)) {
+        GlassBackdrop(lerp(TealMood, NightMood, t)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 72.dp),
+                verticalArrangement = Arrangement.spacedBy(30.dp)
             ) {
-                GlassTabBar(
-                    tabs = listOf(
-                        "Home" to Icons.Default.Home,
-                        "Health" to Icons.Default.Favorite,
-                        "Insights" to Icons.Default.Info,
-                    ),
-                    selected = tab,
-                    onSelect = { tab = it },
-                    modifier = Modifier.weight(1f)
-                )
-                GlassRoundButton(Icons.Default.Star, onClick = {}, size = 76.dp)
-            }
-            GlassSearchField("Ask anything", Icons.Default.Search, Modifier.fillMaxWidth())
-            GlassSegmented(
-                options = listOf("Inbox", "Draft"),
-                selected = box,
-                onSelect = { box = it },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                GlassCard(Modifier.weight(1f).height(152.dp)) {
-                    Text("Morning brief", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = GlassInk)
-                    Text(
-                        "3 meetings, a quiet afternoon and rain after six.",
-                        fontSize = 13.sp,
-                        color = GlassInkSoft,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Glass", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = GlassInk)
+                        Text("one shader · one light", fontSize = 14.sp, color = GlassInkSoft)
+                    }
+                    GlassSwitch(checked = night, onCheckedChange = { night = it })
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    GlassRoundButton(Icons.Default.Lock, onClick = {}, size = 69.dp)
-                    GlassRoundButton(Icons.Default.Notifications, onClick = {}, size = 69.dp)
-                }
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                GlassPressable(
-                    onClick = {},
-                    modifier = Modifier.weight(1f).height(64.dp),
-                    cornerRadius = 32.dp
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    GlassLabel("Sign In")
+                    GlassTabBar(
+                        tabs = listOf(
+                            "Home" to Icons.Default.Home,
+                            "Health" to Icons.Default.Favorite,
+                            "Insights" to Icons.Default.Info,
+                        ),
+                        selected = tab,
+                        onSelect = { tab = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    GlassRoundButton(Icons.Default.Star, onClick = {}, size = 76.dp)
                 }
-                GlassRoundButton(Icons.Default.KeyboardArrowUp, onClick = {})
+                GlassSearchField("Ask anything", Icons.Default.Search, Modifier.fillMaxWidth())
+                GlassSegmented(
+                    options = listOf("Inbox", "Draft"),
+                    selected = box,
+                    onSelect = { box = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    GlassCard(Modifier.weight(1f).height(152.dp)) {
+                        Text("Morning brief", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = GlassInk)
+                        Text(
+                            "3 meetings, a quiet afternoon and rain after six.",
+                            fontSize = 13.sp,
+                            color = GlassInkSoft,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        GlassRoundButton(Icons.Default.Lock, onClick = {}, size = 69.dp)
+                        GlassRoundButton(Icons.Default.Notifications, onClick = {}, size = 69.dp)
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GlassPressable(
+                        onClick = {},
+                        modifier = Modifier.weight(1f).height(64.dp),
+                        cornerRadius = 32.dp
+                    ) {
+                        GlassLabel("Sign In")
+                    }
+                    GlassRoundButton(Icons.Default.KeyboardArrowUp, onClick = {})
+                }
             }
         }
     }
