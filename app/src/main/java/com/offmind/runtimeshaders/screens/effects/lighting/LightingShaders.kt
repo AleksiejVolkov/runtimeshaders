@@ -40,9 +40,11 @@ internal fun buildGlobalBloomShader(maxLights: Int): String = """
 internal fun buildElementReceiverShader(maxLights: Int): String = """
     uniform vec2 elementOrigin;
     uniform float strength;
+    uniform float opaqueInset;      // negative means no guaranteed opaque interior
     uniform float sceneScale;       // scene diagonal in px — normalizes distance to 0..~1
     uniform vec2 lightPositions[$maxLights];
     uniform vec3 lightColors[$maxLights];
+    uniform vec3 glareColors[$maxLights]; // HSV value normalized once when lights change
     uniform float lightIntensities[$maxLights];
 
     vec4 main(float2 fragCoord) {
@@ -69,27 +71,34 @@ internal fun buildElementReceiverShader(maxLights: Int): String = """
 
             accumulated += lightColors[i] * falloff * lightIntensities[i];
 
-            vec3 hsv = RGBtoHSV(lightColors[i]);
-            hsv.z = 1.0;
             vec2 toLight = normalize(lightPositions[i] - worldPos);
             float facing = max(0.0, dot(outwardNormal, toLight));
-            glare += HSVtoRGB(hsv) * falloff * lightIntensities[i] * facing;
+            glare += glareColors[i] * falloff * lightIntensities[i] * facing;
         }
 
         // Edge mask: a pixel is an "inner edge" if it is opaque but has a transparent
         // neighbor. Sampling outward at increasing distances gives a soft glow width.
         float edgeMask = 0.0;
-        float weightSum = 0.0;
-        for (int r = 1; r < 10; r += 2) {
-            float rf = float(r);
-            float minA = min(
-                min(image.eval(fragCoord - vec2(rf, 0.0)).a, image.eval(fragCoord + vec2(rf, 0.0)).a),
-                min(image.eval(fragCoord - vec2(0.0, rf)).a, image.eval(fragCoord + vec2(0.0, rf)).a));
-            float w = 1.0 - rf / 10.0;
-            edgeMask += src.a * (1.0 - minA) * w;
-            weightSum += w;
+        // All 20 neighbors are opaque in this region, so their exact result is zero.
+        // Include an extra pixel beyond the 9px sample radius for texture filtering.
+        float safeInset = opaqueInset + 10.0;
+        bool opaqueInterior = opaqueInset >= 0.0
+            && fragCoord.x > safeInset && fragCoord.y > safeInset
+            && fragCoord.x < resolution.x - safeInset
+            && fragCoord.y < resolution.y - safeInset;
+        if (!opaqueInterior) {
+            float weightSum = 0.0;
+            for (int r = 1; r < 10; r += 2) {
+                float rf = float(r);
+                float minA = min(
+                    min(image.eval(fragCoord - vec2(rf, 0.0)).a, image.eval(fragCoord + vec2(rf, 0.0)).a),
+                    min(image.eval(fragCoord - vec2(0.0, rf)).a, image.eval(fragCoord + vec2(0.0, rf)).a));
+                float w = 1.0 - rf / 10.0;
+                edgeMask += src.a * (1.0 - minA) * w;
+                weightSum += w;
+            }
+            edgeMask /= weightSum;
         }
-        edgeMask /= weightSum;
 
         vec2 localUv = fragCoord / resolution;
         float topRim    = 1.0 - smoothstep(0.0, 0.55, localUv.y);

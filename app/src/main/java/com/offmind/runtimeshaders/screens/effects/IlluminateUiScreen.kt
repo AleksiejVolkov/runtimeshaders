@@ -240,7 +240,7 @@ private fun LightingScopeReceiver.ProjectCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .receivesLight(strength = 1f)
+            .receivesLight(strength = 1f, opaqueInset = 20.dp)
             .background(cardBg)
             .border(1.dp, Palette.Border, RoundedCornerShape(20.dp))
             .padding(18.dp),
@@ -299,7 +299,7 @@ private fun LightingScopeReceiver.MessageCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .receivesLight(strength = 0.7f)
+            .receivesLight(strength = 0.7f, opaqueInset = 16.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Palette.Card)
             .border(1.dp, Palette.Border, RoundedCornerShape(16.dp))
@@ -338,7 +338,7 @@ private fun LightingScopeReceiver.ActivityRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .receivesLight(strength = 1f)
+            .receivesLight(strength = 1f, opaqueInset = 12.dp)
             .shadow(elevation = 10.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Palette.Card)

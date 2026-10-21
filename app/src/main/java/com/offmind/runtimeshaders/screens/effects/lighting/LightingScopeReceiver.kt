@@ -2,6 +2,7 @@ package com.offmind.runtimeshaders.screens.effects.lighting
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 
 /**
  * Receiver scope provided by [LightingScope], mirroring the pattern of [androidx.compose.foundation.layout.RowScope].
@@ -39,6 +40,12 @@ interface LightingScopeReceiver {
     /**
      * Applies a per-element lighting shader that brightens this element's own pixels
      * based on distance to every active light source. [strength] scales the response.
+     *
+     * [opaqueInset] optionally promises that the content is fully opaque inside a
+     * rectangle inset by this amount from all four sides. For an opaque rounded card,
+     * use its corner radius. This skips alpha-neighbor samples in the interior while
+     * keeping the exact edge/glare calculation near its outline. Leave null for
+     * translucent content, holes, or shapes without a guaranteed opaque interior.
      */
-    fun Modifier.receivesLight(strength: Float = 1f): Modifier
+    fun Modifier.receivesLight(strength: Float = 1f, opaqueInset: Dp? = null): Modifier
 }

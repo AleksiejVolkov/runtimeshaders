@@ -150,8 +150,17 @@ helpers in `gl/geometry/`. See `RotatingGlassCubeScene` and `TapePlaneScene` for
 
 `LightingScope { ... }` (`screens/effects/lighting/`) exposes scoped modifiers
 `Modifier.lightSource(...)` and `Modifier.receivesLight(...)`. Light geometry is pushed into bloom
-and receiver shaders as fixed-size arrays capped at `MAX_LIGHTS`. Follow `DualLightTextureScreen` /
-`IlluminateUiScreen`. New scoped modifiers go on `LightingScopeReceiver`.
+and receiver shaders as fixed-size arrays capped at `MAX_LIGHTS`. `LightingState.uniforms` packs
+and caches these arrays (including normalized glare colors) once per light change for all receivers.
+The shaders are time-independent: invalidate layers only on light, size or position changes; do
+not add a frame timer. Empty lighting/bloom passes use no render effect. Follow `IlluminateUiScreen`
+for this DSL; `DualLightTextureScreen` uses its own animated lighting model. New scoped modifiers
+go on `LightingScopeReceiver`.
+
+For an opaque card, `receivesLight(opaqueInset = cornerRadius)` skips edge-mask texture samples
+only inside the guaranteed opaque rectangle, retaining the full edge kernel near its outline.
+Leave this hint null for translucent content or holes. Receiver offscreen bounds are preserved
+when lights turn off, so shadows do not change shape as the identity shader is bypassed.
 
 ## Predictive Back Effects
 
