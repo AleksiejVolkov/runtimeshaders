@@ -2,8 +2,6 @@ package com.offmind.runtimeshaders.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,14 +9,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -41,37 +42,25 @@ import com.offmind.runtimeshaders.navigation.predictive.LocalPredictiveBackRende
 import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackDissolve
 import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackEffect
 import com.offmind.runtimeshaders.navigation.predictive.PredictiveBackRenderState
-import com.offmind.runtimeshaders.screens.AllEffectsListScreen
+import com.offmind.runtimeshaders.screens.AppearancePickerScreen
 import com.offmind.runtimeshaders.screens.BackEffectPickerScreen
+import com.offmind.runtimeshaders.screens.EffectCatalogItem
+import com.offmind.runtimeshaders.screens.EffectCategory
+import com.offmind.runtimeshaders.screens.EffectScreenData
+import com.offmind.runtimeshaders.screens.EffectsCatalogScreen
 import com.offmind.runtimeshaders.screens.SettingsScreen
-import com.offmind.runtimeshaders.screens.effects.BurnAfterReadingScreen
-import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
-import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
-import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
-import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
-import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
-import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
-import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
-import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
-import com.offmind.runtimeshaders.screens.effects.IlluminateUiScreen
-import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
-import com.offmind.runtimeshaders.screens.effects.MetaballsShaderScreen
 import com.offmind.runtimeshaders.screens.effects.NavigationTestFeedScreen
-import com.offmind.runtimeshaders.screens.effects.NavigationTestScreen
-import com.offmind.runtimeshaders.screens.effects.NeonFogButtonScreen
-import com.offmind.runtimeshaders.screens.effects.SnowDialogScreen
-import com.offmind.runtimeshaders.screens.effects.TapePlaneTestScreen
-import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
-import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
-import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effectsCatalog
-import androidx.navigation3.runtime.NavBackStack
+import com.offmind.runtimeshaders.ui.theme.AppAppearance
 import kotlinx.coroutines.launch
 
 internal data class RouteCallbacks(
-    val onEffectSelected: (Route) -> Unit,
+    val onNavigate: (Route) -> Unit,
     val onSettingsSelected: () -> Unit,
     val onChooseBackEffect: () -> Unit,
+    val onChooseAppearance: () -> Unit,
+    val onAppearanceSelected: (AppAppearance) -> Unit,
+    val selectedAppearance: AppAppearance,
     val onBack: () -> Unit,
     val onBackEffectSelected: (PredictiveBackEffect) -> Unit,
     val selectedBackEffect: PredictiveBackEffect
@@ -94,24 +83,32 @@ internal fun PredictiveBackNavDisplay(
     backStack: NavBackStack<NavKey>,
     selectedBackEffect: PredictiveBackEffect,
     onBackEffectSelected: (PredictiveBackEffect) -> Unit,
+    selectedAppearance: AppAppearance,
+    onAppearanceSelected: (AppAppearance) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val callbacks = RouteCallbacks(
-        onEffectSelected = { backStack.add(it) },
+        onNavigate = { backStack.add(it) },
         onSettingsSelected = { backStack.add(Route.Settings) },
         onChooseBackEffect = { backStack.add(Route.BackEffectPicker) },
+        onChooseAppearance = { backStack.add(Route.AppearancePicker) },
+        onAppearanceSelected = onAppearanceSelected,
+        selectedAppearance = selectedAppearance,
         onBack = { backStack.removeLastOrNull() },
         onBackEffectSelected = onBackEffectSelected,
         selectedBackEffect = selectedBackEffect,
     )
+    // Nav entries can retain their original content lambda while settings change. Read the latest
+    // callbacks inside that lambda so already-open pickers update their selected option as well.
+    val currentCallbacks = rememberUpdatedState(callbacks)
 
     // Decorated real entries + scene state — this is what lets NavDisplay show the actual
     // destination (with its preserved state) behind the outgoing screen during the gesture.
     val entries = rememberDecoratedNavEntries(
         backStack = backStack,
         entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
-        entryProvider = routeEntryProvider(callbacks),
+        entryProvider = routeEntryProvider(currentCallbacks),
     )
     val sceneState = rememberSceneState(
         entries = entries,
@@ -197,39 +194,23 @@ private val holdTransform: AnimatedContentTransitionScope<Scene<NavKey>>.() -> C
         fadeOut(tween(BACK_COMPLETE_DURATION_MS), targetAlpha = 1f)
 }
 
-private fun routeEntryProvider(callbacks: RouteCallbacks): (NavKey) -> NavEntry<NavKey> =
+private fun routeEntryProvider(callbacks: State<RouteCallbacks>): (NavKey) -> NavEntry<NavKey> =
     entryProvider {
         routeContentEntry<Route.EffectsList>(callbacks)
         routeContentEntry<Route.Settings>(callbacks)
         routeContentEntry<Route.BackEffectPicker>(callbacks)
-        routeContentEntry<Route.LampShadow>(callbacks)
-        routeContentEntry<Route.Waveshock>(callbacks)
-        routeContentEntry<Route.SnowedDialog>(callbacks)
-        routeContentEntry<Route.TestShader>(callbacks)
-        routeContentEntry<Route.TapePlaneTest>(callbacks)
-        routeContentEntry<Route.CircleTimer>(callbacks)
-        routeContentEntry<Route.CanvasDeform>(callbacks)
-        routeContentEntry<Route.Metaballs>(callbacks)
-        routeContentEntry<Route.ColorfulToggle>(callbacks)
-        routeContentEntry<Route.NeonFogButton>(callbacks)
-        routeContentEntry<Route.DualLightTexture>(callbacks)
-        routeContentEntry<Route.NavigationTest>(callbacks)
+        routeContentEntry<Route.AppearancePicker>(callbacks)
+        routeContentEntry<Route.Category>(callbacks)
+        routeContentEntry<Route.Effect>(callbacks)
         routeContentEntry<Route.NavigationTestFeed>(callbacks)
-        routeContentEntry<Route.IlluminateUi>(callbacks)
-        routeContentEntry<Route.BurnAfterReading>(callbacks)
-        routeContentEntry<Route.NeumorphismBasics>(callbacks)
-        routeContentEntry<Route.NeumorphismThermostat>(callbacks)
-        routeContentEntry<Route.NeumorphismAccents>(callbacks)
-        routeContentEntry<Route.GlassBasics>(callbacks)
-        routeContentEntry<Route.GlassSet>(callbacks)
     }
 
 private inline fun <reified T : Route> EntryProviderScope<NavKey>.routeContentEntry(
-    callbacks: RouteCallbacks
+    callbacks: State<RouteCallbacks>
 ) {
     entry<T> { route ->
         PredictiveBackDissolve(entryKey = route) {
-            RouteContent(route = route, callbacks = callbacks)
+            RouteContent(route = route, callbacks = callbacks.value)
         }
     }
 }
@@ -239,52 +220,52 @@ internal fun RouteContent(
     route: Route,
     callbacks: RouteCallbacks
 ) {
+    val onItemSelected: (EffectCatalogItem) -> Unit = { item ->
+        callbacks.onNavigate(
+            when (item) {
+                is EffectCategory -> Route.Category(item.id)
+                is EffectScreenData -> Route.Effect(item.id)
+            }
+        )
+    }
     when (route) {
-        is Route.EffectsList -> AllEffectsListScreen(
-            effects = effectsCatalog,
-            onEffectSelected = callbacks.onEffectSelected,
-            onSettingsSelected = callbacks.onSettingsSelected
-        )
+        Route.EffectsList, is Route.Category -> {
+            val category = if (route is Route.Category) {
+                effectsCatalog.category(route.categoryId)
+            } else {
+                effectsCatalog.root
+            }
+            EffectsCatalogScreen(
+                category = category,
+                ancestors = effectsCatalog.ancestors(category.id),
+                onItemSelected = onItemSelected,
+                onSettingsSelected = callbacks.onSettingsSelected,
+                onBack = if (route is Route.Category) callbacks.onBack else null,
+            )
+        }
 
-        is Route.Settings -> SettingsScreen(
+        is Route.Effect -> effectsCatalog.effect(route.effectId).content(callbacks.onNavigate)
+
+        Route.Settings -> SettingsScreen(
             onBack = callbacks.onBack,
-            onChooseBackEffect = callbacks.onChooseBackEffect
+            onChooseBackEffect = callbacks.onChooseBackEffect,
+            onChooseAppearance = callbacks.onChooseAppearance,
+            selectedAppearance = callbacks.selectedAppearance,
+            selectedBackEffect = callbacks.selectedBackEffect,
         )
 
-        is Route.BackEffectPicker -> BackEffectPickerScreen(
+        Route.BackEffectPicker -> BackEffectPickerScreen(
             selectedEffect = callbacks.selectedBackEffect,
             onBack = callbacks.onBack,
             onEffectSelected = callbacks.onBackEffectSelected
         )
 
-        is Route.LampShadow -> LampWithShadowScreen()
-        is Route.Waveshock -> WaveshockOnTapScreen()
-        is Route.SnowedDialog -> SnowDialogScreen()
-        is Route.TestShader -> TestShaderScreen()
-        is Route.TapePlaneTest -> TapePlaneTestScreen()
-        is Route.CircleTimer -> TimerShaderScreen()
-        is Route.CanvasDeform -> CanvasDeformScreen()
-        is Route.Metaballs -> MetaballsShaderScreen()
-        is Route.ColorfulToggle -> ColorfulToggleScreen()
-        is Route.NeonFogButton -> NeonFogButtonScreen()
-        is Route.DualLightTexture -> DualLightTextureScreen()
-        is Route.NavigationTest -> NavigationTestScreen(
-            onLogin = {
-                callbacks.onEffectSelected(
-                    Route.NavigationTestFeed(
-                        "Navigation Test Feed",
-                        "Mock feed"
-                    )
-                )
-            }
+        Route.AppearancePicker -> AppearancePickerScreen(
+            selectedAppearance = callbacks.selectedAppearance,
+            onBack = callbacks.onBack,
+            onAppearanceSelected = callbacks.onAppearanceSelected,
         )
-        is Route.NavigationTestFeed -> NavigationTestFeedScreen()
-        is Route.IlluminateUi -> IlluminateUiScreen()
-        is Route.BurnAfterReading -> BurnAfterReadingScreen()
-        is Route.NeumorphismBasics -> NeumorphismBasicsScreen()
-        is Route.NeumorphismThermostat -> NeumorphismThermostatScreen()
-        is Route.NeumorphismAccents -> NeumorphismAccentsScreen()
-        is Route.GlassBasics -> GlassBasicsScreen()
-        is Route.GlassSet -> GlassSetScreen()
+
+        Route.NavigationTestFeed -> NavigationTestFeedScreen()
     }
 }

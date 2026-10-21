@@ -1,158 +1,187 @@
 package com.offmind.runtimeshaders.screens
 
 import com.offmind.runtimeshaders.navigation.Route
+import com.offmind.runtimeshaders.screens.effects.BurnAfterReadingScreen
+import com.offmind.runtimeshaders.screens.effects.CanvasDeformScreen
+import com.offmind.runtimeshaders.screens.effects.ColorfulToggleScreen
+import com.offmind.runtimeshaders.screens.effects.DualLightTextureScreen
+import com.offmind.runtimeshaders.screens.effects.IlluminateUiScreen
+import com.offmind.runtimeshaders.screens.effects.LampWithShadowScreen
+import com.offmind.runtimeshaders.screens.effects.MetaballsShaderScreen
+import com.offmind.runtimeshaders.screens.effects.NavigationTestScreen
+import com.offmind.runtimeshaders.screens.effects.NeonFogButtonScreen
+import com.offmind.runtimeshaders.screens.effects.SnowDialogScreen
+import com.offmind.runtimeshaders.screens.effects.TapePlaneTestScreen
+import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
+import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
+import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
+import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
+import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
+import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
+import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
+import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
 
-internal val effectsCatalog = listOf(
-    EffectScreenData(
-        title = "Glass · basics",
-        description = "A pill, a circle and a card: highlights step by step",
-        screenRoute = Route.GlassBasics(
-            "Glass · basics",
-            "A pill, a circle and a card: highlights step by step"
-        )
+// Add an effect and its screen together in the appropriate category. Categories can nest freely;
+// neither new effects nor new categories need their own Route or AppNavDisplay registration.
+internal val effectsCatalog = EffectCatalog(
+    root = EffectCategory(
+        id = "effects",
+        title = "Effects",
+        description = "Explore materials, scenes and shader experiments",
+        children = listOf(
+            EffectCategory(
+                id = "widgets",
+                title = "Widgets",
+                description = "Glass, soft surfaces, lighting and interactive controls",
+                children = listOf(
+                    EffectCategory(
+                        id = "glass",
+                        title = "Glass",
+                        description = "Translucent surfaces and a shared glass material",
+                        children = listOf(
+                            EffectScreenData(
+                                id = "glass-basics",
+                                title = "Glass · basics",
+                                description = "A pill, a circle and a card: highlights step by step",
+                            ) { GlassBasicsScreen() },
+                            EffectScreenData(
+                                id = "glass-set",
+                                title = "Glass · set",
+                                description = "A whole component set from one glass shader",
+                            ) { GlassSetScreen() },
+                        ),
+                    ),
+                    EffectCategory(
+                        id = "neumorphism",
+                        title = "Neumorphism",
+                        description = "Soft shapes, inset controls and glowing accents",
+                        children = listOf(
+                            EffectScreenData(
+                                id = "neumorphism-basics",
+                                title = "Neumorphism · basics",
+                                description = "Flat, concave and pressed forms from one light",
+                            ) { NeumorphismBasicsScreen() },
+                            EffectScreenData(
+                                id = "neumorphism-accents",
+                                title = "Neumorphism · accents",
+                                description = "Glowing color inside soft UI widgets",
+                            ) { NeumorphismAccentsScreen() },
+                            EffectScreenData(
+                                id = "neumorphism-thermostat",
+                                title = "Neumorphism · thermostat",
+                                description = "A real screen where every element is one material",
+                            ) { NeumorphismThermostatScreen() },
+                        ),
+                    ),
+                    EffectCategory(
+                        id = "lighting",
+                        title = "Lighting",
+                        description = "Shared light sources illuminating a whole interface",
+                        children = listOf(
+                            EffectScreenData(
+                                id = "dual-light-texture",
+                                title = "Dual Light Texture",
+                                description = "Pink and blue light shared across UI elements",
+                            ) { DualLightTextureScreen() },
+                            EffectScreenData(
+                                id = "illuminate-ui",
+                                title = "Illuminate UI",
+                                description = "A dashboard with shared lighting across its widgets",
+                            ) { IlluminateUiScreen() },
+                        ),
+                    ),
+                    EffectCategory(
+                        id = "controls",
+                        title = "Controls",
+                        description = "Buttons, toggles and animated indicators",
+                        children = listOf(
+                            EffectScreenData(
+                                id = "colorful-toggle",
+                                title = "Colorful Toggle",
+                                description = "A colorful shader-driven switch",
+                            ) { ColorfulToggleScreen() },
+                            EffectScreenData(
+                                id = "neon-fog-button",
+                                title = "Neon Fog Button",
+                                description = "A rounded button with an expanding neon fog burst",
+                            ) { NeonFogButtonScreen() },
+                            EffectScreenData(
+                                id = "circular-timer",
+                                title = "Circular Timer",
+                                description = "An animated circular countdown",
+                            ) { TimerShaderScreen() },
+                        ),
+                    ),
+                ),
+            ),
+            EffectCategory(
+                id = "opengl-scenes",
+                title = "OpenGL scenes",
+                description = "3D geometry, glass refraction and flexible surfaces",
+                children = listOf(
+                    EffectScreenData(
+                        id = "opengl-glass",
+                        title = "OpenGL glass",
+                        description = "A rotating glass cube sampling the UI behind it",
+                    ) { TestShaderScreen() },
+                    EffectScreenData(
+                        id = "tape-plane",
+                        title = "Tape plane test",
+                        description = "A segmented OpenGL tape plane",
+                    ) { TapePlaneTestScreen() },
+                ),
+            ),
+            EffectCategory(
+                id = "visual-effects",
+                title = "Visual effects",
+                description = "Distortion, particles, shadows and dissolving content",
+                children = listOf(
+                    EffectScreenData(
+                        id = "waveshock",
+                        title = "Waveshock",
+                        description = "A shockwave spreading from the tap point",
+                    ) { WaveshockOnTapScreen() },
+                    EffectScreenData(
+                        id = "canvas-deform",
+                        title = "Canvas deform",
+                        description = "Canvas deformation controlled by dragging",
+                    ) { CanvasDeformScreen() },
+                    EffectScreenData(
+                        id = "metaballs",
+                        title = "Metaballs",
+                        description = "Merging shapes through UV distortion",
+                    ) { MetaballsShaderScreen() },
+                    EffectScreenData(
+                        id = "lamp-shadow",
+                        title = "Lamp with Shadow",
+                        description = "A lamp with a shadow effect",
+                    ) { LampWithShadowScreen() },
+                    EffectScreenData(
+                        id = "snowed-dialog",
+                        title = "Snowed Dialog",
+                        description = "A winter dialog with falling snow",
+                    ) { SnowDialogScreen() },
+                    EffectScreenData(
+                        id = "burn-after-reading",
+                        title = "Burn After Reading",
+                        description = "A note that burns away from the long-press point",
+                    ) { BurnAfterReadingScreen() },
+                ),
+            ),
+            EffectCategory(
+                id = "navigation",
+                title = "Navigation",
+                description = "Screen flows and transitions between interfaces",
+                children = listOf(
+                    EffectScreenData(
+                        id = "navigation-test",
+                        title = "Navigation Test",
+                        description = "A mock login-to-feed flow",
+                    ) { onNavigate ->
+                        NavigationTestScreen(onLogin = { onNavigate(Route.NavigationTestFeed) })
+                    },
+                ),
+            ),
+        ),
     ),
-    EffectScreenData(
-        title = "Glass · set",
-        description = "A whole component set from one glass shader",
-        screenRoute = Route.GlassSet(
-            "Glass · set",
-            "A whole component set from one glass shader"
-        )
-    ),
-    EffectScreenData(
-        title = "Neumorphism · accents",
-        description = "Glowing color inside soft UI widgets",
-        screenRoute = Route.NeumorphismAccents(
-            "Neumorphism · accents",
-            "Glowing color inside soft UI widgets"
-        )
-    ),
-    EffectScreenData(
-        title = "Neumorphism · basics",
-        description = "Flat, concave and pressed forms from one light",
-        screenRoute = Route.NeumorphismBasics(
-            "Neumorphism · basics",
-            "Flat, concave and pressed forms from one light"
-        )
-    ),
-    EffectScreenData(
-        title = "Neumorphism · thermostat",
-        description = "A real screen where every element is one material",
-        screenRoute = Route.NeumorphismThermostat(
-            "Neumorphism · thermostat",
-            "A real screen where every element is one material"
-        )
-    ),
-    EffectScreenData(
-        title = "Burn After Reading",
-        description = "A note that burns away from the long-press point",
-        screenRoute = Route.BurnAfterReading(
-            "Burn After Reading",
-            "A note that burns away from the long-press point"
-        )
-    ),
-    EffectScreenData(
-        title = "Lamp with Shadow",
-        description = "A lamp with a shadow effect",
-        screenRoute = Route.LampShadow(
-            "Lamp with Shadow",
-            "A lamp with a shadow effect"
-        )
-    ),
-    EffectScreenData(
-        title = "Waveshock",
-        description = "A waveshock on tap effect",
-        screenRoute = Route.Waveshock(
-            "Waveshock",
-            "A waveshock on tap effect"
-        )
-    ),
-    EffectScreenData(
-        title = "Snowed Dialog",
-        description = "",
-        screenRoute = Route.SnowedDialog(
-            "Christmas",
-            ""
-        )
-    ),
-    EffectScreenData(
-        title = "OpenGL glass",
-        description = "OpenGL Cube with glass effect",
-        screenRoute = Route.TestShader(
-            "Test Shader",
-            "Shader for tests"
-        )
-    ),
-    EffectScreenData(
-        title = "Tape plane test",
-        description = "Segmented OpenGL tape plane",
-        screenRoute = Route.TapePlaneTest(
-            "Tape Plane Test",
-            "Segmented OpenGL tape plane"
-        )
-    ),
-    EffectScreenData(
-        title = "Circular Timer",
-        description = "Shader for tests",
-        screenRoute = Route.CircleTimer(
-            "Test Shader",
-            "Shader for tests"
-        )
-    ),
-    EffectScreenData(
-        title = "Canvas deform",
-        description = "Canvas deform on drag",
-        screenRoute = Route.CanvasDeform(
-            "Test Shader",
-            "Shader for tests"
-        )
-    ),
-    EffectScreenData(
-        title = "Metaballs",
-        description = "Metaballs via uv distortion",
-        screenRoute = Route.Metaballs(
-            "Test Shader",
-            "Shader for tests"
-        )
-    ),
-    EffectScreenData(
-        title = "Colorful Toggle",
-        description = "",
-        screenRoute = Route.ColorfulToggle(
-            "Colorful Toggle",
-            ""
-        )
-    ),
-    EffectScreenData(
-        title = "Neon Fog Button",
-        description = "Rounded button with an expanding neon fog burst",
-        screenRoute = Route.NeonFogButton(
-            "Neon Fog Button",
-            "Rounded button with an expanding neon fog burst"
-        )
-    ),
-    EffectScreenData(
-        title = "Dual Light Texture",
-        description = "Pink and blue light shared across UI elements",
-        screenRoute = Route.DualLightTexture(
-            "Dual Light Texture",
-            "Pink and blue light shared across UI elements"
-        )
-    ),
-    EffectScreenData(
-        title = "Illuminate UI",
-        description = "Dashboard UI layout for lighting shader demo",
-        screenRoute = Route.IlluminateUi(
-            "Illuminate UI",
-            "Dashboard UI layout for lighting shader demo"
-        )
-    ),
-    EffectScreenData(
-        title = "Navigation Test",
-        description = "Login to feed mock flow",
-        screenRoute = Route.NavigationTest(
-            "Navigation Test",
-            "Login to feed mock flow"
-        )
-    )
 )

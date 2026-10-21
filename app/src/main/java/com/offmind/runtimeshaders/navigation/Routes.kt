@@ -5,71 +5,23 @@ import kotlinx.serialization.Serializable
 
 sealed class Route : NavKey {
     @Serializable
-    class LampShadow(val title: String, val description: String) : Route()
-
-    @Serializable
-    class Waveshock(val title: String, val description: String) : Route()
-
-    @Serializable
-    class TestShader(val title: String, val description: String) : Route()
-
-    @Serializable
-    class TapePlaneTest(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class CircleTimer(val title: String, val description: String) : Route()
-
-    @Serializable
     data object EffectsList : Route()
+
+    @Serializable
+    data class Category(val categoryId: String) : Route()
+
+    @Serializable
+    data class Effect(val effectId: String) : Route()
 
     @Serializable
     data object Settings : Route()
 
     @Serializable
+    data object AppearancePicker : Route()
+
+    @Serializable
     data object BackEffectPicker : Route()
 
     @Serializable
-    data class SnowedDialog(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class CanvasDeform(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class Metaballs(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class ColorfulToggle(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NeonFogButton(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class DualLightTexture(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NavigationTest(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NavigationTestFeed(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class IlluminateUi(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class BurnAfterReading(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NeumorphismBasics(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NeumorphismThermostat(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class NeumorphismAccents(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class GlassBasics(val title: String, val description: String) : Route()
-
-    @Serializable
-    data class GlassSet(val title: String, val description: String) : Route()
+    data object NavigationTestFeed : Route()
 }

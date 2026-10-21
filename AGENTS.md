@@ -29,7 +29,10 @@ Koin `4.0.0` + Ktor `3.0.1` are declared and Koin is started in `MyApplication`,
 |---|---|
 | Entry | `MainActivity.kt` → `RuntimeShadersApp.kt` → `navigation/RuntimeShadersNavHost.kt` |
 | Navigation (Nav3) | `navigation/AppNavDisplay.kt`, `navigation/Routes.kt` |
-| Effect catalog (landing list) | `screens/EffectsCatalog.kt`, `screens/EffectScreenData.kt` |
+| Effect catalog (groups + screens) | `screens/EffectsCatalog.kt`, `screens/EffectCatalog.kt` |
+| Catalog UI (all levels) | `screens/EffectsCatalogScreen.kt` |
+| App appearance / shared chrome | `ui/theme/AppAppearance.kt`, `ui/components/AppChrome.kt` |
+| App settings persistence | `data/AppSettingsRepository.kt` |
 | Effect screens | `screens/effects/` |
 | Shader wrapper | `shaders/Shader.kt` |
 | Shared shader container | `composables/Uitls.kt` (sic — composable is `ShadedBox`) |
@@ -38,7 +41,7 @@ Koin `4.0.0` + Ktor `3.0.1` are declared and Koin is started in `MyApplication`,
 | Reusable AGSL functions (source) | `buildSrc/.../functions/` |
 | OpenGL layer | `gl/` (renderer, scenes, geometry, embedded surface, background capture) |
 | Lighting DSL | `screens/effects/lighting/` |
-| Predictive-back transitions | `navigation/predictive/`, `data/BackEffectSettingsRepository.kt` |
+| Predictive-back transitions | `navigation/predictive/`, `data/AppSettingsRepository.kt` |
 
 ## Shader Wrapper Rules
 
@@ -93,19 +96,48 @@ To add a function:
 
 Keep names distinct: dependency detection is substring-based.
 
-## Adding A New Effect (3 edits)
+## Adding A New Effect
 
-1. Composable screen in `screens/effects/`.
-2. AGSL source near the screen (local) or in `ShadersCollection.kt` (shared).
-3. `val shader = remember { Shader(source).getRuntimeShader(...) }`; render with `ShadedBox`.
-4. Add a `Route` in `Routes.kt`.
-5. Register it in `routeEntryProvider(...)` **and** add the `RouteContent(...)` `when` branch in
-   `AppNavDisplay.kt`.
-6. Add an `EffectScreenData` entry in `EffectsCatalog.kt`.
-7. Verify: `./gradlew :app:compileDebugKotlin`.
+1. Create a composable screen in `screens/effects/`.
+2. Keep AGSL source near the screen (local) or in `ShadersCollection.kt` (shared).
+3. `remember { Shader(source).getRuntimeShader(...) }`; render with `ShadedBox`.
+4. Add an `EffectScreenData(id, title, description) { MyScreen() }` to the appropriate
+   `EffectCategory.children` in `EffectsCatalog.kt`. The entry registers both the menu item and its
+   screen; **no effect-specific route or `AppNavDisplay.kt` edit is needed**.
+5. Verify: `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest`.
 
-There is **no** `NavHost`/`composable<>` registration in `MainActivity` anymore — navigation is
-Nav3 via `AppNavDisplay.kt`. Keep titles/descriptions consistent between the catalog and the route.
+The catalog is a tree: Widgets → Glass / Neumorphism / Lighting / Controls; OpenGL scenes;
+Visual effects; Navigation. To add a group at any depth, nest another `EffectCategory`.
+`EffectsCatalogScreen` renders every level and derives counts and breadcrumbs from the tree.
+
+Keep IDs unique across the entire tree and stable when renaming or moving items. Navigation 3
+stores only IDs in `Route.Category` / `Route.Effect`; titles and descriptions belong solely to the
+catalog. `EffectCatalog` validates nonempty categories, IDs and titles and indexes the tree.
+`EffectCatalogTest` covers grouping, reachability and restored IDs; extend the expected demo set
+when adding a new demo. Screens with a flow can use the content lambda's `onNavigate` callback
+(see Navigation Test). Only destinations outside the catalog, such as its feed or settings, need
+an explicit `Route` and `AppNavDisplay` registration.
+
+There is no `NavHost`/`composable<>` registration in `MainActivity` — navigation is Nav3 via
+`AppNavDisplay.kt`. Catalog entries use the same saveable-state and predictive-back wrappers as
+other screens, preserving each level's scroll position on return.
+
+## App Appearance
+
+Settings → Appearance switches the catalog (including nested groups), settings and both pickers
+between Classic, Neumorphism and Glass. Effect demos retain their own design. `AppAppearance`
+contains stable IDs and picker metadata; `AppChrome.kt` provides `AppScreen`, `AppMenuRow` and
+`AppIconButton`, reusing the existing widget `neumorphic` / `glass` modifiers. Use these components
+for new app chrome so colors, pressed states and materials follow the selected style. Keep demo
+materials scoped to their screens. The host sets system-bar contrast only for the active chrome
+route, not for background entries or appearance previews.
+
+`AppSettingsRepository` stores appearance and predictive-back choice independently in DataStore.
+It retains the original `back_effect_settings` file and `selected_back_effect` key to preserve
+existing installations. `RuntimeShadersNavHost` waits for the first settings value, then provides
+the appearance without rebuilding the back stack. Add an appearance to `AppAppearance` and its
+rendering in `AppChrome.kt`; the picker derives its options from the enum. Persistence tests use
+real temporary DataStore files and cover reopening, old settings and independent updates.
 
 ## OpenGL Effects
 
@@ -126,7 +158,7 @@ and receiver shaders as fixed-size arrays capped at `MAX_LIGHTS`. Follow `DualLi
 Live under `navigation/predictive/`, hook the global back gesture, and are **not** catalog effects.
 To add one: add a `PredictiveBackEffect` enum entry + its AGSL in `PredictiveBackShaderSource.kt`,
 then verify the picker (`BackEffectPickerScreen`), DataStore persistence
-(`BackEffectSettingsRepository`), and the gesture flow in `AppNavDisplay.kt`. Background:
+(`AppSettingsRepository`), and the gesture flow in `AppNavDisplay.kt`. Background:
 [`PREDICTIVE_BACK_SHADER_NAV3_ARTICLE.md`](PREDICTIVE_BACK_SHADER_NAV3_ARTICLE.md).
 
 ## Build & Verify
@@ -142,8 +174,7 @@ Gradle wrapper is approved for local use; project targets Java 17 (see `BUILD_SE
 ## Gotchas
 
 - `composables/Uitls.kt` is misspelled — renaming touches many imports.
-- `EffectsCatalog.kt` has placeholder route titles ("Test Shader") for several entries; the visible
-  label is the `EffectScreenData.title`, not the route's.
+- Catalog IDs are saved navigation keys: changing an ID can invalidate a restored destination.
 - `WashDownViewScreen.kt`, `EdgeFadeModifier.kt`, `SampleUiElements.kt` are demo/support, not all
   wired into the catalog.
 - Substring-based dependency detection in the generator — avoid helper-name collisions.

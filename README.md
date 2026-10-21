@@ -1,6 +1,6 @@
 # Runtime Shaders
 
-Android shader playground for AGSL runtime shader effects, Compose examples, OpenGL scenes, and predictive-back shader transitions. The app opens to a catalog of effect demos and navigates to individual screens using **Navigation 3**.
+Android shader playground for AGSL runtime shader effects, Compose examples, OpenGL scenes, and predictive-back shader transitions. The app opens to grouped collections and navigates through them to individual demos using **Navigation 3**.
 
 Three rendering techniques coexist:
 
@@ -11,7 +11,7 @@ Three rendering techniques coexist:
 ## Project Map
 
 - `app/src/main/java/com/offmind/runtimeshaders/screens/effects/` contains the example effect screens.
-- `app/src/main/java/com/offmind/runtimeshaders/screens/EffectsCatalog.kt` controls what appears in the effects list.
+- `app/src/main/java/com/offmind/runtimeshaders/screens/EffectsCatalog.kt` defines the collection tree and registers each demo screen in one place.
 - `app/src/main/java/com/offmind/runtimeshaders/navigation/Routes.kt` defines Navigation 3 route keys.
 - `app/src/main/java/com/offmind/runtimeshaders/navigation/AppNavDisplay.kt` maps routes to composable screens and drives the predictive-back gesture.
 - `app/src/main/java/com/offmind/runtimeshaders/shaders/Shader.kt` wraps AGSL code, declares uniforms, and injects generated helper functions.
@@ -21,9 +21,17 @@ Three rendering techniques coexist:
 - `buildSrc/src/main/java/com/offmind/runtimeshaders/scripts/` generates the shader dependency map used by `Shader`.
 - `app/src/main/java/com/offmind/runtimeshaders/gl/` contains the OpenGL renderer, scenes, geometry, embedded-surface composables, and Compose background capture.
 - `app/src/main/java/com/offmind/runtimeshaders/screens/effects/lighting/` contains the `LightingScope` DSL (scoped `lightSource` / `receivesLight` modifiers and their shaders).
-- `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/` contains predictive-back shader effects and state; `data/BackEffectSettingsRepository.kt` persists the chosen effect.
+- `app/src/main/java/com/offmind/runtimeshaders/navigation/predictive/` contains predictive-back shader effects and state; `data/AppSettingsRepository.kt` persists the chosen effect.
 
 For the full architecture, file-by-file breakdown, and tech-stack versions, see [`PROJECT_MAP.md`](PROJECT_MAP.md). Agents should start with [`AGENTS.md`](AGENTS.md).
+
+## App Appearance
+
+Open **Settings → Appearance** to choose **Neumorphism**, **Glass**, or the original **Classic**
+style. The catalog, nested collections, settings and pickers update immediately. The choice is
+saved between launches independently of the predictive-back effect. Demo screens keep their own
+design so their materials can still be compared. Shared chrome components in
+`ui/components/AppChrome.kt` reuse the same glass and neumorphic shaders as the widget demos.
 
 ## Shared Shader Helpers
 
@@ -80,10 +88,24 @@ Use `basicUniformList.addUniform(...)` and `basicUniformList.removeUniform(...)`
 3. Create the shader with `remember { Shader(source).getRuntimeShader(...) }`.
 4. Use `ShadedBox` to render the shader over content or as a direct shader surface.
 5. Add custom uniforms with `basicUniformList.addUniform(Uniform.Type... to "name")`, then pass runtime values with `shaderUniforms`.
-6. Add a route in `Routes.kt`.
-7. Add the route entry in `routeEntryProvider(...)` and the screen mapping in `RouteContent(...)` in `AppNavDisplay.kt`.
-8. Add a visible item in `EffectsCatalog.kt`.
-9. Build with `./gradlew :app:compileDebugKotlin` or `./gradlew assembleDebug`.
+6. Add an `EffectScreenData` entry to the appropriate category in `EffectsCatalog.kt`:
+
+   ```kotlin
+   EffectScreenData(
+       id = "my-effect",
+       title = "My Effect",
+       description = "What the demo shows",
+   ) { MyEffectScreen() }
+   ```
+
+7. Build and verify with `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest`.
+
+The home screen groups demos into **Widgets**, **OpenGL scenes**, **Visual effects** and
+**Navigation**. Widgets contains **Glass**, **Neumorphism**, **Lighting** and **Controls**.
+Nest an `EffectCategory` to add another collection at any depth. New demos and collections need
+no changes in `Routes.kt` or `AppNavDisplay.kt`. Keep IDs unique and stable when changing titles or
+moving entries, since restored navigation uses those IDs. Extend the expected demo set in
+`EffectCatalogTest` when adding a demo.
 
 ## Adding A New Reusable AGSL Function
 
