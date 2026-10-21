@@ -16,12 +16,16 @@ import androidx.compose.ui.unit.dp
 import org.intellij.lang.annotations.Language
 import kotlin.math.min
 
+// one light for every piece of glass: top left, a bit more from above
+val GlassLight = Offset(-0.6f, -0.8f)
+
 fun Modifier.glass(
     cornerRadius: Dp,
     tint: Color = Color.White,
     tintAlpha: Float = 0.10f,   // how much of the body we see: glass is mostly transparent
     edge: Dp = 2.5.dp,          // the rounded edge of the glass: thin, this is where light is caught
     shine: Color = Color.White, // the color of the light reflected by the edges
+    light: Offset = GlassLight, // unit vector towards the light, screen space (y goes down)
 ): Modifier = composed {
     val shader = remember { RuntimeShader(glassShader) }
     val brush = remember { ShaderBrush(shader) }
@@ -32,6 +36,7 @@ fun Modifier.glass(
         shader.setFloatUniform("tintAlpha", tintAlpha)
         shader.setFloatUniform("edge", edge.toPx())
         shader.setColorUniform("shine", shine.toArgb())
+        shader.setFloatUniform("lightDir", light.x, light.y)
         drawRect(brush)
     }
 }
@@ -44,6 +49,7 @@ private val glassShader = """
     uniform float tintAlpha;
     uniform float edge;               // px, width of the rounded edge
     layout(color) uniform half4 shine;
+    uniform float2 lightDir;
 
     float sdRoundBox(float2 p, float2 halfSize, float r) {
         float2 q = abs(p) - halfSize + r;
@@ -82,14 +88,25 @@ private val glassShader = """
         // (Schlick uses the power of 5; on a 2dp edge that's thinner than a pixel, so I use 2)
         float fresnel = pow(1.0 - n.z, 2.0);
 
-        // for now the edge shines the same all around
-        float rim = fresnel * 0.6;
+        // which way this piece of the edge looks: towards the light, or away from it.
+        float facing = dot(EdgeDir(p), lightDir);
+
+        // the edge facing the light mirrors it: that's the key highlight. The opposite edge
+        // shines too, weaker: light went through the plate and comes out there
+        float key = pow(max(facing, 0.0), 1.5);
+        float back = pow(max(-facing, 0.0), 1.5);
+        float rim = fresnel * (0.45 + 1.4 * key + 0.9 * back);
+
+        // the flat top is a weak mirror too (Fresnel never goes to zero): it reflects a bright sky
+        // on the side of the light and fades to nothing on the other side
+        float along = dot((p - size * 0.5) / max(size.x, size.y), -lightDir);   // -0.5..0.5
+        float sky = smoothstep(0.1, -0.5, along) * 0.07;
 
         // the body: a thin tinted filter over whatever is behind it (premultiplied)
         float a = tintAlpha * inside;
         half4 glass = half4(tint.rgb * a, a);
         // the reflected light lies on top of it
-        glass = Over(glass, shine.rgb, (rim) * inside);
+        glass = Over(glass, shine.rgb, (sky + rim) * inside);
         return glass;
     }
 """.trimIndent()
