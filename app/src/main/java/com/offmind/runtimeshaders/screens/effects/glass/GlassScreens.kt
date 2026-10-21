@@ -56,7 +56,9 @@ fun GlassBasicsScreen() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.size(width = 200.dp, height = 68.dp).glass(cornerRadius = 34.dp),
+                    modifier = Modifier
+                        .size(width = 200.dp, height = 68.dp)
+                        .glass(cornerRadius = 34.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Sign In", fontSize = 22.sp, fontWeight = FontWeight.Medium, color = Ink)

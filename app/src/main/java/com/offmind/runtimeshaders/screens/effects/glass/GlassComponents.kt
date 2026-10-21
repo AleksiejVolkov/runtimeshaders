@@ -51,7 +51,9 @@ data class GlassStyle(val tint: Color, val tintAlpha: Float, val shine: Color, v
 
 val DayGlass = GlassStyle(Color.White, tintAlpha = 0.10f, shine = Color.White, wellAlpha = 0.16f)
 // at night the body is barely there and the light is a little colder
-val NightGlass = GlassStyle(Color.White, tintAlpha = 0.05f, shine = Color(0xFFDCE4FF), wellAlpha = 0.32f)
+val NightGlass = GlassStyle(
+    Color.White, tintAlpha = 0.05f, shine = Color(0xFFDCE4FF), wellAlpha = 0.32f
+)
 
 fun lerp(a: GlassStyle, b: GlassStyle, t: Float) = GlassStyle(
     tint = lerp(a.tint, b.tint, t),
