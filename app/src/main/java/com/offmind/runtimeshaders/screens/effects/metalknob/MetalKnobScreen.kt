@@ -1,7 +1,12 @@
 package com.offmind.runtimeshaders.screens.effects.metalknob
 
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,8 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -20,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +56,7 @@ fun MetalKnobScreen() {
     val haptics = LocalHapticFeedback.current
     val knobRadiusPx = with(LocalDensity.current) { KnobRadius.toPx() }
     var value by remember { mutableFloatStateOf(0.62f) }
+    val (light, tracker) = rememberTiltLight()
     val shader = remember {
         Shader(metalKnobShader).getRuntimeShader(
             uniforms = basicUniformList
@@ -77,9 +87,11 @@ fun MetalKnobScreen() {
                     }
                     value = next
                 }
-            },
+            }
+            .pointerInput(tracker) { detectTapGestures(onDoubleTap = { tracker.recenter() }) },
         contentAlignment = Alignment.Center,
     ) {
+        val lightDir = light.value
         ShadedBox(
             modifier = Modifier.fillMaxSize(),
             shader = shader,
@@ -87,13 +99,13 @@ fun MetalKnobScreen() {
                 "knobRadius" to ShaderTypedValue.FloatType(knobRadiusPx),
                 "knobAngle" to ShaderTypedValue.FloatType((value - 0.5f) * Sweep),
                 "knobValue" to ShaderTypedValue.FloatType(value),
-                // for now the lamp is fixed: up and to the left, a bit in front of the screen
-                "lightDir" to ShaderTypedValue.Vec3Type(-0.45f, -0.6f, 0.66f),
+                "lightDir" to ShaderTypedValue.Vec3Type(lightDir.x, lightDir.y, lightDir.z),
             ),
         )
 
         Text(
-            text = "Drag around the knob to turn it.",
+            text = "Tilt or twist the phone to move the light.\n" +
+                "Drag around the knob to turn it, double-tap to recenter.",
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
@@ -121,4 +133,41 @@ fun MetalKnobScreen() {
             )
         }
     }
+}
+
+/** Light direction driven by the gyroscope-backed rotation vector, or by gravity as a fallback. */
+@Composable
+private fun rememberTiltLight(): Pair<State<LightDirection>, TiltLightTracker> {
+    val context = LocalContext.current
+    val rotation = context.display?.rotation ?: 0
+    val light = remember { mutableStateOf(LightDirection.Base) }
+    val tracker = remember(rotation) {
+        TiltLightTracker { light.value = it }.apply { displayRotation = rotation }
+    }
+
+    DisposableEffect(context, tracker) {
+        val sensorManager = context.getSystemService(SensorManager::class.java)
+        val rotationSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
+        val gravitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
+            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                when (event.sensor.type) {
+                    Sensor.TYPE_GAME_ROTATION_VECTOR -> tracker.onRotationVector(event.values)
+                    else -> tracker.onGravity(event.values)
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+        }
+        (rotationSensor ?: gravitySensor)?.let {
+            sensorManager?.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+        onDispose {
+            sensorManager?.unregisterListener(listener)
+            light.value = LightDirection.Base
+        }
+    }
+
+    return light to tracker
 }
