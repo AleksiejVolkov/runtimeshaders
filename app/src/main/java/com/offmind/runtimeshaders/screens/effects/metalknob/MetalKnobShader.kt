@@ -26,6 +26,13 @@ internal val metalKnobShader = """
         return pow(sqrt(max(0.0, 1.0 - th * th)), power);
     }
 
+    // V-shaped ring groove: returns radial slope of the surface.
+    float grooveSlope(float r, float center, float halfWidth, float depth) {
+        float d = r - center;
+        float inside = 1.0 - smoothstep(halfWidth * 0.8, halfWidth, abs(d));
+        return sign(d) * depth / halfWidth * inside;
+    }
+
     float ring(float r, float center, float width) {
         float d = (r - center) / width;
         return exp(-d * d);
@@ -50,22 +57,43 @@ internal val metalKnobShader = """
         return mix(col, ink, mask);
     }
 
-    vec3 metalFace(vec2 p, float r, vec2 tangential, vec3 l, vec3 fill) {
-        // Every ring of the lathe gets its own random brightness.
+    vec3 metalFace(vec2 p, float r, vec2 radial, vec2 tangential, float a, vec3 l, vec3 fill) {
         float ringId = floor(r * knobRadius / 1.15);
         float grain = hash11(ringId);
+        float grain2 = hash11(ringId + 37.0);
 
-        // The face is still flat, but its grooves run around the centre.
-        vec3 n = vec3(0.0, 0.0, 1.0);
+        // Radial slope from the lathe: random per-ring wobble, two machined grooves, a centre dimple.
+        float slope = (grain - 0.5) * 0.18;
+        slope += grooveSlope(r, 0.34, 0.018, 0.006);
+        slope += grooveSlope(r, 0.58, 0.014, 0.005);
+        slope -= 0.25 * (1.0 - smoothstep(0.03, 0.07, r));
+
+        vec2 tilt = -radial * slope;
+
+        // Knurled band near the edge: radial cuts that turn with the knob.
+        float band = smoothstep(0.795, 0.805, r) * (1.0 - smoothstep(0.878, 0.888, r));
+        float phase = (a - knobAngle) * 160.0 / (2.0 * PI);
+        tilt += tangential * cos(phase * 2.0 * PI) * 0.32 * band;
+        tilt += -radial * (grooveSlope(r, 0.80, 0.008, 0.002) + grooveSlope(r, 0.883, 0.008, 0.002));
+
+        vec3 n = normalize(vec3(tilt, 1.0));
         vec3 t = vec3(tangential, 0.0);
+        t = normalize(t - n * dot(t, n));
 
-        float spec = brushed(t, l, 100.0) + 0.45 * brushed(t, fill, 100.0);
+        float power = mix(70.0, 150.0, grain2);
+        float spec = brushed(t, l, power) + 0.45 * brushed(t, fill, power);
         float sheen = 0.38 * brushed(t, l, 7.0) + 0.16 * brushed(t, fill, 7.0);
+        vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
+        float glint = pow(max(dot(n, h), 0.0), 48.0);
         float diffuse = max(dot(n, l), 0.0);
 
-        vec3 col = STEEL * (0.30 + 0.28 * diffuse + sheen);
+        // Slight angular unevenness of the brushing, attached to the knob, makes turning visible.
+        float uneven = 0.025 * sin(3.0 * (a - knobAngle) + grain * 6.2831);
+
+        vec3 col = STEEL * (0.30 + 0.28 * diffuse + sheen + uneven);
         col *= 0.955 + 0.09 * grain;
-        col += vec3(0.95, 0.97, 1.0) * spec * 0.48;
+        col += vec3(0.95, 0.97, 1.0) * (spec * (0.36 + 0.24 * grain2) + glint * 0.3);
+        col *= 1.0 - 0.10 * band;
 
         // Indicator notch.
         vec2 dir = vec2(sin(knobAngle), -cos(knobAngle));
@@ -126,7 +154,7 @@ internal val metalKnobShader = """
 
         // The knob itself.
         vec3 knob = r < FACE_RADIUS + 0.01
-            ? metalFace(p, r, tangential, l, fill)
+            ? metalFace(p, r, radial, tangential, a, l, fill)
             : chromeRim(r);
         float knobMask = 1.0 - smoothstep(1.0 - px, 1.0 + px, r);
         knob *= 1.0 - 0.5 * ring(r, 0.995, 0.008);
