@@ -113,8 +113,20 @@ internal val metalKnobShader = """
         return col;
     }
 
-    vec3 chromeRim(float r) {
-        return vec3(0.42, 0.43, 0.46);
+    vec3 chromeRim(float r, vec2 radial, vec3 l, vec3 fill) {
+        float t = clamp((r - FACE_RADIUS) / (1.0 - FACE_RADIUS), 0.0, 1.0);
+        vec3 n = normalize(vec3(radial * mix(0.35, 2.4, t * t), 1.0));
+        vec3 refl = reflect(vec3(0.0, 0.0, -1.0), n);
+        // Studio environment: a soft sky that brightens toward the light plus two lamp reflections.
+        float env = 0.22 + 0.38 * clamp(dot(refl, l) * 0.5 + 0.5, 0.0, 1.0);
+        env += 0.9 * pow(max(dot(refl, l), 0.0), 6.0);
+        env += 0.35 * pow(max(dot(refl, fill), 0.0), 5.0);
+        // Steeper outer edge mirrors the dark floor around the knob.
+        env *= mix(1.0, 0.55, smoothstep(0.5, 1.0, t));
+        vec3 col = vec3(0.62, 0.64, 0.68) * env;
+        // Bright lip at the inner edge of the bevel.
+        col += 0.25 * ring(r, FACE_RADIUS + 0.014, 0.006) * (0.4 + 0.6 * max(dot(radial, -l.xy), 0.0));
+        return col;
     }
 
     half4 main(vec2 fragCoord) {
@@ -155,7 +167,11 @@ internal val metalKnobShader = """
         // The knob itself.
         vec3 knob = r < FACE_RADIUS + 0.01
             ? metalFace(p, r, radial, tangential, a, l, fill)
-            : chromeRim(r);
+            : chromeRim(r, radial, l, fill);
+        if (r >= FACE_RADIUS - 0.012 && r < FACE_RADIUS + 0.01) {
+            knob = mix(knob, chromeRim(r, radial, l, fill),
+                smoothstep(FACE_RADIUS - 0.002, FACE_RADIUS + 0.008, r));
+        }
         float knobMask = 1.0 - smoothstep(1.0 - px, 1.0 + px, r);
         knob *= 1.0 - 0.5 * ring(r, 0.995, 0.008);
         col = mix(col, knob, knobMask);
