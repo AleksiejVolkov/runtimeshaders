@@ -17,6 +17,7 @@ import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
+import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
@@ -110,6 +111,11 @@ internal val effectsCatalog = EffectCatalog(
                                 title = "Circular Timer",
                                 description = "An animated circular countdown",
                             ) { TimerShaderScreen() },
+                            EffectScreenData(
+                                id = "metal-knob",
+                                title = "Metal Knob",
+                                description = "A brushed steel knob lit by tilting the phone",
+                            ) { MetalKnobScreen() },
                         ),
                     ),
                 ),
