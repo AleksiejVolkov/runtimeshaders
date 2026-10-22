@@ -13,6 +13,10 @@ internal val metalKnobShader = """
     const vec3 BACKGROUND = vec3(0.918, 0.918, 0.928);
     const vec3 STEEL = vec3(0.80, 0.815, 0.84);
 
+    float hash11(float n) {
+        return fract(sin(n * 127.1 + 11.3) * 43758.5453);
+    }
+
     float ring(float r, float center, float width) {
         float d = (r - center) / width;
         return exp(-d * d);
@@ -38,8 +42,18 @@ internal val metalKnobShader = """
     }
 
     vec3 metalFace(vec2 p, float r, vec3 l) {
-        // No metal yet: a flat grey face.
-        vec3 col = STEEL * 0.78;
+        // Every ring of the lathe gets its own random brightness.
+        float ringId = floor(r * knobRadius / 1.15);
+        float grain = hash11(ringId);
+
+        // A textbook Blinn-Phong on a flat face.
+        vec3 n = vec3(0.0, 0.0, 1.0);
+        vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
+        float diffuse = max(dot(n, l), 0.0);
+        float spec = pow(max(dot(n, h), 0.0), 48.0);
+
+        vec3 col = STEEL * (0.45 + 0.4 * diffuse) * (0.85 + 0.3 * grain);
+        col += vec3(0.95, 0.97, 1.0) * spec * 0.3;
 
         // Indicator notch.
         vec2 dir = vec2(sin(knobAngle), -cos(knobAngle));
