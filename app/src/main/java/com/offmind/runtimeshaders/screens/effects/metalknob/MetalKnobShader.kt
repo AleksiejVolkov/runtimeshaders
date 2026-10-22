@@ -2,7 +2,8 @@ package com.offmind.runtimeshaders.screens.effects.metalknob
 
 import org.intellij.lang.annotations.Language
 
-// Scene units: 1.0 is the knob radius. Everything is lit by `lightDir` (screen space, y down).
+// Scene units: 1.0 is the knob radius. Everything is lit by `lightDir` (screen space, y down)
+// plus a weaker fill light turned 90° around the view axis, so the brushed face shows four lobes.
 @Language("AGSL")
 internal val metalKnobShader = """
     const float PI = 3.14159265;
@@ -15,6 +16,14 @@ internal val metalKnobShader = """
 
     float hash11(float n) {
         return fract(sin(n * 127.1 + 11.3) * 43758.5453);
+    }
+
+    // Kajiya-Kay: brushed grooves reflect along a cone around their tangent, which turns
+    // circular brushing into the bright wedges that rotate with the light.
+    float brushed(vec3 tangent, vec3 l, float power) {
+        vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
+        float th = dot(tangent, h);
+        return pow(sqrt(max(0.0, 1.0 - th * th)), power);
     }
 
     float ring(float r, float center, float width) {
@@ -41,19 +50,22 @@ internal val metalKnobShader = """
         return mix(col, ink, mask);
     }
 
-    vec3 metalFace(vec2 p, float r, vec3 l) {
+    vec3 metalFace(vec2 p, float r, vec2 tangential, vec3 l, vec3 fill) {
         // Every ring of the lathe gets its own random brightness.
         float ringId = floor(r * knobRadius / 1.15);
         float grain = hash11(ringId);
 
-        // A textbook Blinn-Phong on a flat face.
+        // The face is still flat, but its grooves run around the centre.
         vec3 n = vec3(0.0, 0.0, 1.0);
-        vec3 h = normalize(l + vec3(0.0, 0.0, 1.0));
-        float diffuse = max(dot(n, l), 0.0);
-        float spec = pow(max(dot(n, h), 0.0), 48.0);
+        vec3 t = vec3(tangential, 0.0);
 
-        vec3 col = STEEL * (0.45 + 0.4 * diffuse) * (0.85 + 0.3 * grain);
-        col += vec3(0.95, 0.97, 1.0) * spec * 0.3;
+        float spec = brushed(t, l, 100.0) + 0.45 * brushed(t, fill, 100.0);
+        float sheen = 0.38 * brushed(t, l, 7.0) + 0.16 * brushed(t, fill, 7.0);
+        float diffuse = max(dot(n, l), 0.0);
+
+        vec3 col = STEEL * (0.30 + 0.28 * diffuse + sheen);
+        col *= 0.955 + 0.09 * grain;
+        col += vec3(0.95, 0.97, 1.0) * spec * 0.48;
 
         // Indicator notch.
         vec2 dir = vec2(sin(knobAngle), -cos(knobAngle));
@@ -82,9 +94,11 @@ internal val metalKnobShader = """
         float r = length(p);
         float px = 1.0 / knobRadius;
         vec2 radial = r > 1e-4 ? p / r : vec2(0.0, -1.0);
+        vec2 tangential = vec2(-radial.y, radial.x);
         float a = atan(p.x, -p.y);      // 0 at the top, clockwise
 
         vec3 l = normalize(lightDir);
+        vec3 fill = normalize(vec3(-l.y, l.x, l.z * 1.4));
         vec2 shadowShift = l.xy / max(l.z, 0.2);
 
         // Background with the soft shadow of the raised platform.
@@ -111,7 +125,9 @@ internal val metalKnobShader = """
         col = mix(col, platform, platformMask);
 
         // The knob itself.
-        vec3 knob = r < FACE_RADIUS + 0.01 ? metalFace(p, r, l) : chromeRim(r);
+        vec3 knob = r < FACE_RADIUS + 0.01
+            ? metalFace(p, r, tangential, l, fill)
+            : chromeRim(r);
         float knobMask = 1.0 - smoothstep(1.0 - px, 1.0 + px, r);
         knob *= 1.0 - 0.5 * ring(r, 0.995, 0.008);
         col = mix(col, knob, knobMask);
