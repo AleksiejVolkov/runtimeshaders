@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.sp
 private val Travel = 220f // dp
 private val SquareSize = 56.dp
 
-/** Chapter 6: one animation, read in three different phases. */
+/** One animation, read in three different phases. */
 internal enum class ReadPhase(val label: String, val code: String, val bad: Boolean) {
     Composition("Composition", "Modifier.offset(x.value.dp)", bad = true),
     Placement("Placement", "Modifier.offset { IntOffset(x.value.dp.roundToPx(), 0) }", bad = false),

@@ -40,7 +40,7 @@ private val ButtonHeight = 56.dp
 private val ButtonShape = RoundedCornerShape(28.dp)
 
 /**
- * The hook and chapter 12: two buttons that look the same. The left one starts as code an agent
+ * Two buttons that look the same. The left one starts as code an agent
  * really writes and takes the three fixes one at a time; the right one is always fully fixed.
  */
 internal enum class GlowFix(val label: String, val note: String) {

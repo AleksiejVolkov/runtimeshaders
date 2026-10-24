@@ -38,7 +38,7 @@ import kotlinx.coroutines.yield
 import java.util.Locale
 
 /**
- * Chapter 11: the four prices of a shader, measured on this device. "Create" and "update" are
+ * The prices of a shader, measured on this device. "Create" and "update" are
  * timed in-process on the main thread, where composition would create them. "First draw" swaps
  * the shader of a static preview and logs the frames that follow: a new program is compiled on
  * RenderThread for the first frame that uses it.

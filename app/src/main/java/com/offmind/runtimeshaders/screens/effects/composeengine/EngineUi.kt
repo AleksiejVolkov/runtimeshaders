@@ -58,7 +58,7 @@ internal fun EngineScreen(
     }
 }
 
-/** A row of mutually exclusive options; the film switches variants with it. */
+/** A row of mutually exclusive options; switches between the variants of a demo. */
 @Composable
 internal fun <T> EngineChoice(
     label: String,

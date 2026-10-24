@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Chapters 10–11: the same effect on a button or on the whole screen, as a brush or a layer effect. */
+/** The same effect on a button or on the whole screen, as a brush or a layer effect. */
 private enum class ShaderArea(val label: String) { Button("Button"), FullScreen("Full screen"), Off("Off") }
 
 private enum class ShaderPath(val label: String, val code: String) {

@@ -5,7 +5,7 @@ import android.os.Trace
 import org.intellij.lang.annotations.Language
 
 // The demos call android.graphics.RuntimeShader directly instead of the project's Shader wrapper:
-// the film shows the platform API exactly as an app (or an agent) writes it.
+// the demos show the platform API exactly as an app (or an agent) writes it.
 
 /** A soft highlight running across a dark button. `time` goes 0 → 1 per sweep. */
 @Language("AGSL")

@@ -47,7 +47,7 @@ class EffectCatalogTest {
     }
 
     @Test
-    fun `compose engine demos form one group at the root in film order`() {
+    fun `compose engine demos form one group at the root in their order`() {
         assertEquals(
             listOf("engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost"),
             effectsCatalog.category("compose-engine").children.map { it.id },
