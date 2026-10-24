@@ -15,6 +15,7 @@ import com.offmind.runtimeshaders.screens.effects.TapePlaneTestScreen
 import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
 import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.ChargeRingVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DistortionVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DustVersusScreen
@@ -259,6 +260,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Vinyl · with and without a shader",
                         description = "Groove sheen that follows a moving lamp: per-pixel or gradients",
                     ) { VinylVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-charge",
+                        title = "Charging ring · with and without a shader",
+                        description = "Flickering rays and a flowing stream that grow with the charge",
+                    ) { ChargeRingVersusScreen() },
                 ),
             ),
         ),
