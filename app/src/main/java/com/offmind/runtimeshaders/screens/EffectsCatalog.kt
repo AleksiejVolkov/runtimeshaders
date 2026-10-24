@@ -20,6 +20,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScr
 import com.offmind.runtimeshaders.screens.effects.composeengine.DistortionVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DustVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.EdgeFadeVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.GlassToggleVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.NormalMapVersusScreen
@@ -265,6 +266,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Charging ring · with and without a shader",
                         description = "Flickering rays and a flowing stream that grow with the charge",
                     ) { ChargeRingVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-toggle",
+                        title = "Glass toggle · with and without a shader",
+                        description = "Frosted glass over moving light: a refracting lens or a blurred copy",
+                    ) { GlassToggleVersusScreen() },
                 ),
             ),
         ),
