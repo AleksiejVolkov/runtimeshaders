@@ -72,6 +72,9 @@ dependencies {
     // no longer comes with material3
     implementation("androidx.compose.material:material-icons-core")
     implementation(libs.datastore.preferences)
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
+    implementation(libs.haze.glass)
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
