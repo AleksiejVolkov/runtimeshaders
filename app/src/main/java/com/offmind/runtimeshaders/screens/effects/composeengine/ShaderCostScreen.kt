@@ -171,10 +171,10 @@ private suspend fun measureCpuCosts(): List<String> {
     try {
         repeat(WARMUP) { RuntimeShader(GLOW_SHADER); yield() }
 
-        val sameSource = List(SAMPLES) { timeNs { RuntimeShader(GLOW_SHADER) }.also { yield() } }
+        val sameSource = List(SAMPLES) { timeNs { sink = RuntimeShader(GLOW_SHADER) }.also { yield() } }
         val uniqueSource = List(SAMPLES) {
             val source = saltedGlowShader(SystemClock.elapsedRealtimeNanos() + it)
-            timeNs { RuntimeShader(source) }.also { yield() }
+            timeNs { sink = RuntimeShader(source) }.also { yield() }
         }
         val shader = RuntimeShader(GLOW_SHADER)
         val uniform = List(SAMPLES) {
@@ -182,10 +182,10 @@ private suspend fun measureCpuCosts(): List<String> {
         }
         val effectShader = RuntimeShader(areaShaderSource(sampleContent = true))
         val effect = List(SAMPLES) {
-            timeNs { repeat(BATCH) { RenderEffect.createRuntimeShaderEffect(effectShader, "content") } }
+            timeNs { repeat(BATCH) { sink = RenderEffect.createRuntimeShaderEffect(effectShader, "content") } }
                 .also { yield() }
         }
-        val brush = List(SAMPLES) { timeNs { repeat(BATCH) { ShaderBrush(shader) } }.also { yield() } }
+        val brush = List(SAMPLES) { timeNs { repeat(BATCH) { sink = ShaderBrush(shader) } }.also { yield() } }
 
         return listOf(
             "new RuntimeShader, same source     ${sameSource.stats()}",
@@ -198,6 +198,10 @@ private suspend fun measureCpuCosts(): List<String> {
         Trace.endAsyncSection("ComposeEngine#measureCpuCosts", 0)
     }
 }
+
+// Every timed result is stored here, so R8 cannot drop an allocation whose result is unused.
+@Volatile
+private var sink: Any? = null
 
 private const val WARMUP = 20
 private const val SAMPLES = 100
