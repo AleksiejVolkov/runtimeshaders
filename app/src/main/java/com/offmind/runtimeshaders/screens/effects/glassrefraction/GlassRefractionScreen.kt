@@ -1,5 +1,7 @@
 package com.offmind.runtimeshaders.screens.effects.glassrefraction
 
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,14 +17,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.intellij.lang.annotations.Language
 
 // A piece of thick glass over a live list. Everything the glass bends is the list below it.
 @Composable
@@ -30,14 +36,39 @@ fun GlassRefractionScreen() {
     Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
         CardList(Modifier.fillMaxSize())
 
+        val shape = RoundedCornerShape(36.dp)
+        val probe = remember { RuntimeShader(probeShader) }
         Box(
             Modifier
                 .align(Alignment.Center)
                 .size(width = 320.dp, height = 220.dp)
-                .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
-        )
+                .graphicsLayer {
+                    // without the clip the effect is not limited to the panel at all
+                    clip = true
+                    this.shape = shape
+                    renderEffect = RenderEffect.createRuntimeShaderEffect(probe, "image")
+                        .asComposeRenderEffect()
+                }
+                .border(1.dp, Color.White.copy(alpha = 0.5f), shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("own content", color = Color.White, fontSize = 18.sp)
+        }
     }
 }
+
+// What does a shader on the panel get as `image`? Paint magenta stripes wherever it is empty.
+@Language("AGSL")
+private val probeShader = """
+    uniform shader image;
+
+    half4 main(float2 xy) {
+        half4 own = image.eval(xy);
+        if (own.a > 0.0) return own;
+        float stripes = step(0.5, fract((xy.x + xy.y) / 24.0));
+        return half4(mix(half3(0.55, 0.0, 0.55), half3(1.0, 0.0, 1.0), stripes), 1.0);
+    }
+"""
 
 private val CardColors = listOf(
     Color(0xFFFF5252) to Color(0xFFFFB74D),
