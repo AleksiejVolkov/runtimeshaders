@@ -17,6 +17,7 @@ import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DistortionVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.DustVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
@@ -235,6 +236,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Distortion · with and without a shader",
                         description = "A ripple over a live list: per-pixel reads or a snapshot every frame",
                     ) { DistortionVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-dust",
+                        title = "Dust · with and without a shader",
+                        description = "A message bubble turns into dust: per-pixel gather or CPU particles",
+                    ) { DustVersusScreen() },
                 ),
             ),
         ),
