@@ -38,20 +38,35 @@ private val Thickness = 70.dp
 private val Bevel = 100.dp
 private const val IndexOfRefraction = 1.5f // glass
 private val FrostRadius = 16.dp
+// one shader cuts every panel, so their number is fixed by the size of the uniform arrays
+const val MaxGlassPanels = 4
 
 // The glass is drawn by the backdrop, not by the panel: this layer already has every pixel
 // the glass needs to bend.
-fun Modifier.glassBackdrop(panel: GlassPanel, frosted: Boolean = false): Modifier = composed {
+fun Modifier.glassBackdrop(
+    panels: List<GlassPanel>,
+    frosted: Boolean = false,
+): Modifier = composed {
     val identity = remember { RuntimeShader(identityShader) }
     val glass = remember { RuntimeShader(glassShader) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     this
         .onGloballyPositioned { origin = it.positionInRoot() }
         .graphicsLayer {
-            // the panel in the backdrop's own pixels
-            val r = panel.bounds.translate(-origin)
-            glass.setFloatUniform("panel", r.left, r.top, r.width, r.height)
-            glass.setFloatUniform("cornerRadius", panel.cornerRadius.toPx())
+            // the panels in the backdrop's own pixels
+            val bounds = FloatArray(MaxGlassPanels * 4)
+            val cornerRadii = FloatArray(MaxGlassPanels)
+            panels.take(MaxGlassPanels).forEachIndexed { i, panel ->
+                val r = panel.bounds.translate(-origin)
+                bounds[i * 4] = r.left
+                bounds[i * 4 + 1] = r.top
+                bounds[i * 4 + 2] = r.width
+                bounds[i * 4 + 3] = r.height
+                cornerRadii[i] = panel.cornerRadius.toPx()
+            }
+            glass.setFloatUniform("panels", bounds)
+            glass.setFloatUniform("cornerRadii", cornerRadii)
+            glass.setFloatUniform("panelCount", minOf(panels.size, MaxGlassPanels).toFloat())
             glass.setFloatUniform("thickness", Thickness.toPx())
             glass.setFloatUniform("bevel", Bevel.toPx())
             glass.setFloatUniform("ior", IndexOfRefraction)
@@ -87,8 +102,9 @@ private val identityShader = """
 @Language("AGSL")
 private val glassShader = """
     uniform shader image;
-    uniform float4 panel;          // left, top, width, height in backdrop pixels
-    uniform float cornerRadius;
+    uniform float4 panels[$MaxGlassPanels];   // left, top, width, height in backdrop pixels
+    uniform float cornerRadii[$MaxGlassPanels];
+    uniform float panelCount;
     uniform float thickness;       // px
     uniform float bevel;           // px, how far in from the edge the glass is rounded
     uniform float ior;             // index of refraction
@@ -119,7 +135,7 @@ private val glassShader = """
         return thickness / b * x / sqrt(max(1.0 - x * x, 1e-3));
     }
 
-    half4 main(float2 xy) {
+    half4 glassOver(float2 xy, float4 panel, float cornerRadius) {
         float2 halfSize = panel.zw * 0.5;
         float2 p = xy - panel.xy - halfSize;
         float sd = sdRoundedBox(p, halfSize, cornerRadius);
@@ -146,5 +162,14 @@ private val glassShader = """
         half3 color = image.eval(xy + shift).rgb;
         color = mix(color, half3(1.0), 0.06);
         return half4(color, 1.0) * coverage;
+    }
+
+    half4 main(float2 xy) {
+        for (int i = 0; i < $MaxGlassPanels; i++) {
+            if (float(i) >= panelCount) break;
+            half4 color = glassOver(xy, panels[i], cornerRadii[i]);
+            if (color.a > 0.0) return color;
+        }
+        return half4(0.0);
     }
 """

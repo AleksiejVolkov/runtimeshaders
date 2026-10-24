@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -34,17 +36,39 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun GlassRefractionScreen() {
     Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
-        val panel = remember { GlassPanel() }
+        val card = remember { GlassPanel() }
+        val toolbar = remember { GlassPanel() }
+        val button = remember { GlassPanel() }
+        val player = remember { GlassPanel() }
+        val panels = listOf(card, toolbar, button, player)
         var frosted by remember { mutableStateOf(false) }
-        CardList(Modifier.fillMaxSize().glassBackdrop(panel, frosted))
+        CardList(Modifier.fillMaxSize().glassBackdrop(panels, frosted))
 
-        Box(
-            Modifier
-                .align(Alignment.Center)
-                .size(width = 320.dp, height = 220.dp)
-                .glassPanel(panel, cornerRadius = 36.dp)
-                .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
+        GlassBox(
+            card, 36.dp,
+            Modifier.align(Alignment.Center).size(width = 320.dp, height = 220.dp),
         )
+        GlassBox(
+            toolbar, 36.dp,
+            Modifier.statusBarsPadding().padding(16.dp).fillMaxWidth().height(72.dp),
+        ) {
+            Text("Cards", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        }
+        GlassBox(
+            button, 48.dp,
+            Modifier.align(Alignment.TopEnd).padding(top = 190.dp, end = 24.dp).size(96.dp),
+        )
+        GlassBox(
+            player, 28.dp,
+            Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 96.dp)
+                .fillMaxWidth()
+                .height(80.dp),
+        ) {
+            Text("Now playing · Glass", color = Color.White, fontSize = 18.sp)
+        }
 
         Chip(
             text = if (frosted) "frosted" else "clear",
@@ -54,6 +78,25 @@ fun GlassRefractionScreen() {
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp),
         )
+    }
+}
+
+// The panel draws only its outline and its own content; the glass under it is drawn by the
+// backdrop.
+@Composable
+private fun GlassBox(
+    panel: GlassPanel,
+    cornerRadius: Dp,
+    modifier: Modifier,
+    content: @Composable () -> Unit = {},
+) {
+    Box(
+        modifier
+            .glassPanel(panel, cornerRadius)
+            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(cornerRadius)),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
