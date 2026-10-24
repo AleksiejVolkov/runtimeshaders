@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,19 +19,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.hazeGlass
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 // A piece of thick glass over a live list. Everything the glass bends is the list below it.
 @Composable
@@ -42,24 +53,41 @@ fun GlassRefractionScreen() {
         val player = remember { GlassPanel() }
         val panels = listOf(card, toolbar, button, player)
         var frosted by remember { mutableStateOf(false) }
-        CardList(Modifier.fillMaxSize().glassBackdrop(panels, frosted))
+        var useHaze by remember { mutableStateOf(false) }
+        val hazeState = rememberHazeState()
+        // the same screen two ways: our glass on the backdrop, or Haze's glass on every panel
+        val haze = if (useHaze) GlassHaze(hazeState, frosted) else null
+        // Haze records the list only while the list draws, and a list that stands still does
+        // not draw again: without one more frame the new glass would have nothing to show.
+        var redraws by remember { mutableIntStateOf(0) }
+        LaunchedEffect(useHaze) {
+            withFrameNanos { }
+            redraws++
+        }
+        CardList(
+            if (haze != null) {
+                Modifier.fillMaxSize().hazeSource(hazeState).drawBehind { redraws }
+            } else {
+                Modifier.fillMaxSize().glassBackdrop(panels, frosted)
+            }
+        )
 
         GlassBox(
-            card, 36.dp,
+            card, 36.dp, haze,
             Modifier.align(Alignment.Center).size(width = 320.dp, height = 220.dp),
         )
         GlassBox(
-            toolbar, 36.dp,
+            toolbar, 36.dp, haze,
             Modifier.statusBarsPadding().padding(16.dp).fillMaxWidth().height(72.dp),
         ) {
             Text("Cards", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
         GlassBox(
-            button, 48.dp,
+            button, 48.dp, haze,
             Modifier.align(Alignment.TopEnd).padding(top = 190.dp, end = 24.dp).size(96.dp),
         )
         GlassBox(
-            player, 28.dp,
+            player, 28.dp, haze,
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -70,30 +98,49 @@ fun GlassRefractionScreen() {
             Text("Now playing · Glass", color = Color.White, fontSize = 18.sp)
         }
 
-        Chip(
-            text = if (frosted) "frosted" else "clear",
-            onClick = { frosted = !frosted },
-            modifier = Modifier
+        Row(
+            Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp),
-        )
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Chip(text = if (frosted) "frosted" else "clear", onClick = { frosted = !frosted })
+            Chip(text = if (useHaze) "Haze" else "backdrop", onClick = { useHaze = !useHaze })
+        }
     }
 }
 
+private class GlassHaze(val state: HazeState, val frosted: Boolean)
+
 // The panel draws only its outline and its own content; the glass under it is drawn by the
-// backdrop.
+// backdrop. With Haze it is the other way round: the panel replays the list and draws the
+// glass.
 @Composable
 private fun GlassBox(
     panel: GlassPanel,
     cornerRadius: Dp,
+    haze: GlassHaze?,
     modifier: Modifier,
     content: @Composable () -> Unit = {},
 ) {
+    val shape = RoundedCornerShape(cornerRadius)
+    val glass = if (haze != null) {
+        Modifier.hazeGlass(
+            input = HazeInput.Sources(haze.state),
+            style = GlassStyle {
+                shape(shape)
+                optics(blurRadius = if (haze.frosted) FrostRadius else 0.dp)
+            },
+        ).clip(shape)
+    } else {
+        Modifier
+    }
     Box(
         modifier
             .glassPanel(panel, cornerRadius)
-            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(cornerRadius)),
+            .then(glass)
+            .border(1.dp, Color.White.copy(alpha = 0.5f), shape),
         contentAlignment = Alignment.Center,
     ) {
         content()

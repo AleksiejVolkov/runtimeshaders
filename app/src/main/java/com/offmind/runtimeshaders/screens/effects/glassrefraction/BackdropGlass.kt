@@ -37,7 +37,7 @@ fun Modifier.glassPanel(panel: GlassPanel, cornerRadius: Dp): Modifier = onGloba
 private val Thickness = 70.dp
 private val Bevel = 100.dp
 private const val IndexOfRefraction = 1.5f // glass
-private val FrostRadius = 16.dp
+internal val FrostRadius = 16.dp
 // one shader cuts every panel, so their number is fixed by the size of the uniform arrays
 const val MaxGlassPanels = 4
 
