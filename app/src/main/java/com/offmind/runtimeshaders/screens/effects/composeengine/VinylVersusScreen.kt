@@ -46,7 +46,7 @@ import kotlin.math.sin
 // Proportions of the record, as fractions of its radius.
 private const val LABEL = 0.34f      // the paper label
 private const val TRACK = 0.11f      // width of one track; the smooth gaps between tracks show as rings
-private const val GROOVE_PX = 2.2f   // groove pitch, px (finer than the eye resolves: it shows as sheen)
+private const val GROOVE_PX = 3.2f   // groove pitch, px
 
 /**
  * The lamp: a point light gliding on an ellipse that passes over the record off-centre, fairly
@@ -63,6 +63,8 @@ uniform float2 center;
 uniform float radius;
 uniform float3 lamp;      // point light: x, y, height (px)
 
+float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+
 half4 main(float2 p) {
     float2 d = p - center;
     float r = length(d);
@@ -73,24 +75,34 @@ half4 main(float2 p) {
     float3 tangent = float3(-radial.y, radial.x, 0.0);
     // Tracks are grooved; the narrow lands between tracks are smooth and catch no sheen.
     float track = fract((r / radius - 0.34) / 0.11);
-    float grooved = smoothstep(0.0, 0.04, track) * smoothstep(1.0, 0.96, track);
-    // The groove wall tilts the normal along the radius, back and forth at the groove pitch.
-    float slope = sin(r * 6.2831853 / 2.2) * 0.35 * grooved;
+    float grooved = smoothstep(0.0, 0.025, track) * smoothstep(1.0, 0.975, track);
+
+    // One groove every 3.2 px, a V in cross-section: the inner wall faces the centre, the outer
+    // wall faces out. Each groove has its own depth, like the loudness of the music cut into it.
+    float g = r / 3.2;
+    float across = fract(g);
+    float level = 0.45 + 0.55 * hash(floor(g));
+    float wall = smoothstep(0.0, 0.2, across) - 2.0 * smoothstep(0.4, 0.6, across) + smoothstep(0.8, 1.0, across);
+    float slope = wall * 0.55 * level * grooved;
     float3 n = normalize(float3(radial * slope, 1.0));
 
     float3 toLamp = lamp - float3(p, 0.0);
     float dist = length(toLamp);
     float3 l = toLamp / dist;
     float3 h = normalize(l + float3(0.0, 0.0, 1.0));       // viewer straight above
+    float falloff = radius * radius / (radius * radius + dist * dist * 0.6);
     // Anisotropic sheen (Kajiya-Kay): bright where the groove tangent is perpendicular to h —
     // a band through the centre, pointing at the lamp, that bends and narrows as the lamp moves.
     float th = dot(tangent, h);
-    float sheen = pow(sqrt(max(1.0 - th * th, 0.0)), 220.0) * grooved;
-    float gloss = pow(max(dot(n, h), 0.0), 60.0) * 0.12;
-    float falloff = radius * radius / (radius * radius + dist * dist * 0.6);
-    float diffuse = max(dot(n, l), 0.0) * 0.05;
-    half3 c = half3(0.022, 0.022, 0.026) + half3(diffuse)
-            + half3(0.80, 0.83, 0.90) * half((sheen * 0.85 + gloss) * falloff);
+    float sheen = pow(sqrt(max(1.0 - th * th, 0.0)), 90.0) * grooved;
+    // Inside the band each wall either catches the lamp or not: the band is striped by grooves.
+    float walls = pow(max(dot(n, h), 0.0), 24.0);
+    float band = sheen * (0.25 + 1.1 * walls) * (0.6 + 0.4 * level);
+    // A dim light from above everywhere, so the grooves read even away from the band.
+    float fill = max(dot(n, normalize(float3(0.0, -0.6, 1.0))), 0.0);
+    half3 c = half3(0.016, 0.016, 0.019) + half3(0.035, 0.035, 0.04) * half(fill * fill)
+            + half3(0.82, 0.85, 0.92) * half(band * falloff)
+            + half3(0.05) * half(max(dot(n, l), 0.0) * falloff);
     return half4(c * half(edge), half(edge));
 }
 """
@@ -180,7 +192,7 @@ private fun GradientVinyl(lampT: State<Float>, modifier: Modifier) {
             val c = Offset(size.width / 2f, size.height / 2f)
             val r = size.minDimension / 2f * 0.98f
             val grooves = Brush.radialGradient(
-                0f to Color(0xFF070708), 0.5f to Color(0xFF1A1A1D), 1f to Color(0xFF070708),
+                0f to Color(0xFF050506), 0.5f to Color(0xFF26262B), 1f to Color(0xFF050506),
                 center = c,
                 radius = GROOVE_PX,
                 tileMode = TileMode.Repeated,
