@@ -17,6 +17,7 @@ import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
+import com.offmind.runtimeshaders.screens.effects.glassrefraction.GlassRefractionScreen
 import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
@@ -50,6 +51,11 @@ internal val effectsCatalog = EffectCatalog(
                                 title = "Glass · set",
                                 description = "A whole component set from one glass shader",
                             ) { GlassSetScreen() },
+                            EffectScreenData(
+                                id = "glass-refraction",
+                                title = "Glass · refraction",
+                                description = "Thick glass over a live list, bent on the backdrop",
+                            ) { GlassRefractionScreen() },
                         ),
                     ),
                     EffectCategory(

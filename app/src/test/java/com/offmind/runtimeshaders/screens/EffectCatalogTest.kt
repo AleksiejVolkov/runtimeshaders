@@ -16,7 +16,7 @@ class EffectCatalogTest {
         }
         val ids = collectEffects(effectsCatalog.root)
         val expectedIds = setOf(
-            "glass-basics", "glass-set", "neumorphism-basics", "neumorphism-accents",
+            "glass-basics", "glass-set", "glass-refraction", "neumorphism-basics", "neumorphism-accents",
             "neumorphism-thermostat", "dual-light-texture", "illuminate-ui", "colorful-toggle",
             "neon-fog-button", "circular-timer", "metal-knob", "opengl-glass", "tape-plane", "waveshock",
             "canvas-deform", "metaballs", "lamp-shadow", "snowed-dialog", "burn-after-reading",
@@ -42,7 +42,7 @@ class EffectCatalogTest {
             listOf("opengl-glass", "tape-plane"),
             effectsCatalog.category("opengl-scenes").children.map { it.id },
         )
-        assertEquals(11, effectsCatalog.category("widgets").effectCount)
+        assertEquals(12, effectsCatalog.category("widgets").effectCount)
     }
 
     @Test

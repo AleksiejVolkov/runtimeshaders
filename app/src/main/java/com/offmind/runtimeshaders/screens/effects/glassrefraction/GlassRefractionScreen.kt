@@ -1,0 +1,89 @@
+package com.offmind.runtimeshaders.screens.effects.glassrefraction
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// A piece of thick glass over a live list. Everything the glass bends is the list below it.
+@Composable
+fun GlassRefractionScreen() {
+    Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
+        CardList(Modifier.fillMaxSize())
+
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .size(width = 320.dp, height = 220.dp)
+                .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
+        )
+    }
+}
+
+private val CardColors = listOf(
+    Color(0xFFFF5252) to Color(0xFFFFB74D),
+    Color(0xFF7C4DFF) to Color(0xFF40C4FF),
+    Color(0xFF00C853) to Color(0xFFC6FF00),
+    Color(0xFFFF4081) to Color(0xFFEA80FC),
+    Color(0xFFFFD600) to Color(0xFFFF6D00),
+    Color(0xFF00B8D4) to Color(0xFF1DE9B6),
+)
+
+// Bright cards with straight lines on them: straight lines show bending best.
+@Composable
+private fun CardList(modifier: Modifier) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(200) { index ->
+            val (from, to) = CardColors[index % CardColors.size]
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Brush.linearGradient(listOf(from, to)))
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Card ${index + 1}",
+                    color = Color(0xFF101114),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                listOf(1f, 0.8f, 0.55f).forEach { width ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth(width)
+                            .height(6.dp)
+                            .background(
+                                Color(0xFF101114).copy(alpha = 0.75f),
+                                RoundedCornerShape(3.dp),
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
