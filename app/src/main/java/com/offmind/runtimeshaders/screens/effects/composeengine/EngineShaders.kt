@@ -23,11 +23,14 @@ half4 main(float2 p) {
 }
 """
 
-/** The same glow source with an extra constant, so that it is a different program to every cache. */
+/**
+ * The same glow with a different constant, so that it is a different program to every cache. The
+ * constant changes the output as a full-precision float, so it cannot fold away into the same code.
+ */
 internal fun saltedGlowShader(salt: Long): String = GLOW_SHADER.replace(
     "uniform float time;",
-    "uniform float time;\nconst float salt = ${salt % 1_000_000}.0;",
-).replace("return half4(base", "return half4(base * half(1.0 + salt * 1e-9)")
+    "uniform float time;\nconst float salt = ${salt % 100_000}.0;",
+).replace("return half4(base", "return half4(half3(float3(base) * (1.0 - salt * 1e-7))")
 
 /**
  * The glow over a noise field whose cost is set by `octaves` (1…32): area × complexity, the same
