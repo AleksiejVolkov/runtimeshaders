@@ -121,7 +121,7 @@ fun GlassRefractionScreen() {
 }
 
 private enum class GlassMode(val label: String) {
-    Backdrop("backdrop"), Haze("Haze"), Platform("Android 37.2");
+    Backdrop("backdrop"), Haze("Haze"), Platform("API 37.2");
 
     fun next(): GlassMode {
         val modes = entries.filter { it != Platform || PlatformBackdropAvailable }
