@@ -24,6 +24,16 @@ android {
         release {
             isMinifyEnabled = false
         }
+        // Release code shrunk and optimized by R8, signed with the debug key, installed next to the
+        // debug app: the build that on-device performance measurements are taken from.
+        create("benchmark") {
+            initWith(getByName("release"))
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".benchmark"
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
