@@ -2,13 +2,10 @@ package com.offmind.runtimeshaders.screens.effects.composeengine
 
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,11 +33,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -50,46 +51,83 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.intellij.lang.annotations.Language
 
-// Geometry in dp, the same on both sides. The glass thumb is taller than the track and slides
-// along it; the orange light sits under the thumb's leading half and travels with it.
+// Geometry in dp, the same on both sides. A dark groove; inside it a smaller "active" pill that
+// slides on its own (faster, shorter travel) and turns from orange to dark grey; on top a large
+// frosted glass thumb that slides on its own, slower, past the groove's ends.
 private val StageH = 200.dp
 private val TrackW = 300.dp
 private val TrackH = 96.dp
-private val ThumbW = 200.dp
-private val ThumbH = 108.dp
-private val Orange = Color(0xFFFF7A1A)
+private val PillW = 128.dp
+private val PillH = 64.dp
+private val ThumbW = 214.dp
+private val ThumbH = 112.dp
+private val CapD = 84.dp
+private val Orange = Color(0xFFFF7A12)
+private val Amber = Color(0xFFFFB347)
+private val PillOff = Color(0xFF34353B)
 
-/** The thumb's left edge inside the stage, px, for slide progress 0 (off) … 1 (on). */
-private fun Density.thumbLeft(progress: Float, stageW: Float): Float {
-    val trackLeft = (stageW - TrackW.toPx()) / 2f
-    val from = trackLeft - 8.dp.toPx()
-    val to = trackLeft + TrackW.toPx() - ThumbW.toPx() + 8.dp.toPx()
-    return from + (to - from) * progress
+private fun Density.trackLeft(stageW: Float) = (stageW - TrackW.toPx()) / 2f
+
+/** The thumb's left edge, px, for its progress 0 (off, left) … 1 (on, right). */
+private fun Density.thumbLeft(p: Float, stageW: Float): Float {
+    val from = trackLeft(stageW) - 10.dp.toPx()
+    val to = trackLeft(stageW) + TrackW.toPx() - ThumbW.toPx() + 10.dp.toPx()
+    return from + (to - from) * p
 }
 
-/** Track, label and the orange light — the content the glass sits on, in stage coordinates. */
-private fun DrawScope.drawToggleContent(progress: Float, label: TextLayoutResult, stage: Size = size) {
-    val trackLeft = (stage.width - TrackW.toPx()) / 2f
-    val trackTop = (stage.height - TrackH.toPx()) / 2f
+/** The active pill's left edge, px: a shorter path than the thumb's, on its own timing. */
+private fun Density.pillLeft(p: Float, stageW: Float): Float {
+    val from = trackLeft(stageW) + 16.dp.toPx()
+    val to = trackLeft(stageW) + 74.dp.toPx() // on: peeks out from under the glass
+    return from + (to - from) * p
+}
+
+private class ToggleLabels(val on: TextLayoutResult, val off: TextLayoutResult)
+
+@Composable
+private fun rememberToggleLabels(): ToggleLabels {
+    val measurer = rememberTextMeasurer()
+    return remember(measurer) {
+        val style = TextStyle(color = Color(0xFFC9CBD2), fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+        ToggleLabels(measurer.measure("ON", style), measurer.measure("OFF", style))
+    }
+}
+
+/** Groove, labels and the active pill with its glow — what the glass sits on, in stage px. */
+private fun DrawScope.drawGroove(thumbP: Float, pillP: Float, labels: ToggleLabels, stage: Size = size) {
+    val left = trackLeft(stage.width)
+    val top = (stage.height - TrackH.toPx()) / 2f
     val r = TrackH.toPx() / 2f
-    drawRoundRect(Color(0xFF16171B), Offset(trackLeft, trackTop), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r))
+    drawRoundRect(Color(0xFF141519), Offset(left, top), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r))
     drawRoundRect(
-        Color(0xFF3A3C44), Offset(trackLeft, trackTop), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r),
+        Color(0xFF3A3C44), Offset(left, top), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r),
         style = Stroke(6.dp.toPx()),
     )
-    drawText(label, topLeft = Offset(trackLeft + 40.dp.toPx(), (stage.height - label.size.height) / 2f))
-    // the light: an orange pill and a wide soft glow, centred on the thumb's leading third
-    val thumbX = thumbLeft(progress, stage.width)
-    val lightC = Offset(thumbX + ThumbW.toPx() * 0.28f, stage.height / 2f)
-    drawCircle(
-        Brush.radialGradient(listOf(Orange.copy(alpha = 0.85f), Orange.copy(alpha = 0.25f), Color.Transparent), lightC, 120.dp.toPx()),
-        120.dp.toPx(), lightC,
+    val labelY = (stage.height - labels.on.size.height) / 2f
+    drawText(labels.on, topLeft = Offset(left + 24.dp.toPx(), labelY), alpha = thumbP)
+    drawText(
+        labels.off,
+        topLeft = Offset(left + TrackW.toPx() - 40.dp.toPx() - labels.off.size.width, labelY),
+        alpha = 1f - thumbP,
     )
+    // the active pill: orange and glowing when on, dark grey when off
+    val pl = pillLeft(pillP, stage.width)
+    val pt = (stage.height - PillH.toPx()) / 2f
+    val pc = Offset(pl + PillW.toPx() / 2f, stage.height / 2f)
+    val glow = 110.dp.toPx()
     drawCircle(
-        Brush.radialGradient(listOf(Color(0xFFFFB066), Orange, Orange.copy(alpha = 0f)), lightC, 46.dp.toPx()),
-        46.dp.toPx(), lightC,
+        Brush.radialGradient(listOf(Orange.copy(alpha = 0.55f * pillP), Color.Transparent), pc, glow),
+        glow, pc,
+    )
+    drawRoundRect(
+        Brush.horizontalGradient(
+            listOf(lerp(PillOff, Amber, pillP), lerp(PillOff, Orange, pillP)), startX = pl, endX = pl + PillW.toPx(),
+        ),
+        Offset(pl, pt), Size(PillW.toPx(), PillH.toPx()), CornerRadius(PillH.toPx() / 2f),
     )
 }
 
@@ -97,7 +135,6 @@ private fun DrawScope.drawToggleContent(progress: Float, label: TextLayoutResult
 private const val GLASS_SHADER = """
 uniform shader content;
 uniform float4 thumb;     // left, top, right, bottom (px)
-uniform float corner;     // corner radius (px)
 uniform float dp;         // px per dp
 
 float box(float2 p, float2 b, float r) {
@@ -107,16 +144,17 @@ float box(float2 p, float2 b, float r) {
 
 float sd(float2 p) {
     float2 c = (thumb.xy + thumb.zw) * 0.5;
-    return box(p - c, (thumb.zw - thumb.xy) * 0.5, corner);
+    float2 h = (thumb.zw - thumb.xy) * 0.5;
+    return box(p - c, h, h.y);
 }
 
-half4 frosted(float2 q, float radius) {
-    // 16 taps on a golden-angle spiral: a soft disk blur of what is underneath
-    half4 acc = half4(0.0);
+// 16 taps on a golden-angle spiral: a soft disk blur of what lies under the glass
+half3 frosted(float2 q, float radius) {
+    half3 acc = half3(0.0);
     for (int i = 0; i < 16; i++) {
         float a = float(i) * 2.39996;
         float rr = sqrt((float(i) + 0.5) / 16.0) * radius;
-        acc += content.eval(q + float2(cos(a), sin(a)) * rr);
+        acc += content.eval(q + float2(cos(a), sin(a)) * rr).rgb;
     }
     return acc / 16.0;
 }
@@ -126,70 +164,79 @@ half4 main(float2 p) {
     float d = sd(p);
     if (d > 1.0) return under;
 
-    // The rim is a lens: near the edge the glass bends the light behind it towards the centre,
-    // a little more for blue than for red.
     float2 e = float2(1.0, 0.0);
     float2 n = normalize(float2(sd(p + e.xy) - sd(p - e.xy), sd(p + e.yx) - sd(p - e.yx)));
-    float rim = 1.0 - clamp(-d / (16.0 * dp), 0.0, 1.0);
-    float bend = rim * rim * 22.0 * dp;
-    float blur = 9.0 * dp;
-    half r = frosted(p - n * bend * 0.92, blur).r;
-    half g = frosted(p - n * bend, blur).g;
-    half b = frosted(p - n * bend * 1.08, blur).b;
-    half3 glass = half3(r, g, b);
+    float rim = 1.0 - clamp(-d / (12.0 * dp), 0.0, 1.0);
+    // a thick sheet of glass: the rim bends what is under it a little towards the centre
+    half3 glass = frosted(p - n * rim * rim * 8.0 * dp, 11.0 * dp);
+    glass = mix(glass, half3(0.93, 0.93, 0.96), 0.13);
+    float lit = dot(n, normalize(float2(-1.0, -1.3)));
+    glass += half3(0.45) * half(rim * rim * max(lit, 0.0));
+    glass += half3(0.35) * half(smoothstep(1.6 * dp, 0.0, -d));          // thin bright edge
+    glass *= half(1.0 - rim * max(-lit, 0.0) * 0.25);
 
-    // frost tint, a bevel lit from the top left, a darker lower edge
-    glass = mix(glass, half3(0.92, 0.92, 0.95), 0.10);
-    float light = dot(n, normalize(float2(-1.0, -1.2)));
-    glass += half3(0.55) * half(rim * rim * max(light, 0.0));
-    glass *= half(1.0 - rim * rim * max(-light, 0.0) * 0.35);
-
-    // a grid of raised dots on the leading half
     float2 local = p - thumb.xy;
+    float h = thumb.w - thumb.y;
+    // raised dots on the leading part
     float2 cell = float2(16.0 * dp);
     float2 gc = (floor(local / cell) + 0.5) * cell;
-    if (gc.x > 30.0 * dp && gc.x < 105.0 * dp && gc.y > 30.0 * dp && gc.y < (thumb.w - thumb.y) - 30.0 * dp) {
+    if (gc.x > 28.0 * dp && gc.x < 104.0 * dp && gc.y > 28.0 * dp && gc.y < h - 28.0 * dp) {
         float2 dd = local - gc;
         float dot_ = length(dd) - 3.2 * dp;
         float shade = dot(normalize(dd + 1e-3), normalize(float2(-1.0, -1.0)));
-        glass += half3(0.25) * half(smoothstep(1.0, -1.0, dot_) * (0.4 + 0.6 * shade));
+        glass += half3(0.22) * half(smoothstep(1.0, -1.0, dot_) * (0.45 + 0.55 * shade));
     }
-    float edge = clamp(0.5 - d, 0.0, 1.0);
-    half4 outC = half4(glass, 1.0);
-    return mix(under, outC, half(edge));
+    // the round cap at the trailing end: lighter glass with diagonal stripes
+    float2 capC = float2(thumb.z - thumb.x - h * 0.5, h * 0.5);
+    float capD = length(local - capC) - 42.0 * dp;
+    if (capD < 0.0) {
+        float stripes = 0.5 + 0.5 * sin((local.x + local.y) * 0.9 / dp);
+        glass = mix(glass, half3(0.86, 0.80, 0.80), 0.28) + half3(0.05) * half(stripes);
+    }
+    glass += half3(0.18) * half(smoothstep(1.5 * dp, 0.0, abs(capD)));
+    return mix(under, half4(glass, 1.0), half(clamp(0.5 - d, 0.0, 1.0)));
 }
 """
 
 private enum class ToggleImpl(val label: String) {
-    Shader("AGSL: frosted lens"),
+    Shader("AGSL: frosted glass"),
     NoShader("Without a shader: blurred copy"),
 }
 
 @Composable
 internal fun GlassToggleVersusScreen() {
     var impl by rememberSaveable { mutableStateOf(ToggleImpl.Shader) }
-    val progress = rememberInfiniteTransition(label = "toggle").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(1_600, delayMillis = 700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "slide",
-    )
+    val thumb = remember { Animatable(0f) }
+    val pill = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        var on = false
+        while (true) {
+            delay(1_400)
+            on = !on
+            val target = if (on) 1f else 0f
+            // two parts, two speeds: the pill in the groove is quicker than the glass above it
+            launch { thumb.animateTo(target, tween(780, easing = FastOutSlowInEasing)) }
+            launch { pill.animateTo(target, tween(420, easing = LinearOutSlowInEasing)) }
+        }
+    }
     val frames by rememberFrameSummary("screen=vs-toggle variant=${impl.name}")
     val alloc = recordAllocations("vs-toggle", impl.name)
 
     EngineScreen(
         title = "A glass toggle over light",
-        subtitle = "Frosted glass slides over an orange glow; the light moves underneath it.",
+        subtitle = "The groove's pill and the glass thumb move at their own speeds; the glass frosts what is under it.",
     ) {
         EngineChoice("Implementation", ToggleImpl.entries, impl, { it.label }) { impl = it }
         FrameReadout(frames)
         Text(alloc?.toDisplay() ?: "", style = MonoSmall.copy(color = EngineDim))
         val stage = Modifier.fillMaxWidth().height(StageH)
         when (impl) {
-            ToggleImpl.Shader -> ShaderToggle(progress, stage)
-            ToggleImpl.NoShader -> CopyToggle(progress, stage)
+            ToggleImpl.Shader -> ShaderToggle(thumb.asState(), pill.asState(), stage)
+            ToggleImpl.NoShader -> CopyToggle(thumb.asState(), pill.asState(), stage)
         }
         Text(
-            if (impl == ToggleImpl.Shader) "RenderEffect: inside the thumb, read the light underneath — blurred, bent at the rim"
-            else "the same light drawn again inside the clipped thumb, in a blurred layer; tint, rim and dots on top",
+            if (impl == ToggleImpl.Shader) "RenderEffect: inside the thumb, read and blur what is underneath; bevel, dots, cap"
+            else "the groove drawn again inside the clipped thumb, in a blurred layer; tint, rim, dots, cap on top",
             color = EngineDim,
             fontSize = 11.sp,
         )
@@ -197,106 +244,103 @@ internal fun GlassToggleVersusScreen() {
 }
 
 @Composable
-private fun ShaderToggle(progress: State<Float>, modifier: Modifier) {
-    val label = rememberToggleLabel()
+private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modifier) {
+    val labels = rememberToggleLabels()
     val shader = remember { newRuntimeShader(GLASS_SHADER) }
     Box(
         modifier
             .graphicsLayer {
-                val left = thumbLeft(progress.value, size.width)
+                val left = thumbLeft(thumbP.value, size.width)
                 val top = (size.height - ThumbH.toPx()) / 2f
                 shader.setFloatUniform("thumb", left, top, left + ThumbW.toPx(), top + ThumbH.toPx())
-                shader.setFloatUniform("corner", ThumbH.toPx() / 2f)
                 shader.setFloatUniform("dp", 1.dp.toPx())
                 renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
             }
-            .drawBehind { drawToggleContent(progress.value, label) },
+            .drawBehind { drawGroove(thumbP.value, pillP.value, labels) },
     )
 }
 
-@Composable
-private fun rememberToggleLabel(): TextLayoutResult {
-    val measurer = rememberTextMeasurer()
-    return remember(measurer) {
-        measurer.measure("ON", TextStyle(color = Color(0xFFC9CBD2), fontSize = 26.sp, fontWeight = FontWeight.SemiBold))
-    }
-}
-
 /**
- * The best version without a custom shader: the frosted look comes from drawing the same light a
- * second time inside the thumb — clipped to its shape, shifted so it lines up, in a layer blurred
- * by RenderEffect — plus a white tint, a gradient rim and dots on top. It blurs, but it cannot
- * bend: the rim does not act as a lens and there are no colored fringes.
+ * The best version without a custom shader — what blur libraries such as Haze do: draw the content
+ * under the glass a second time inside the clipped thumb, shifted to line up, in a layer blurred by
+ * RenderEffect (wider than the thumb, so the edge has real neighbours to blur), then tint, rim,
+ * dots and the striped cap on top. It frosts; it cannot bend light at the rim.
  */
 @Composable
-private fun CopyToggle(progress: State<Float>, modifier: Modifier) {
-    val label = rememberToggleLabel()
+private fun CopyToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modifier) {
+    val labels = rememberToggleLabels()
     var stage by remember { mutableStateOf(Size.Zero) }
+    val margin = 30.dp
     Box(
         modifier
             .onSizeChanged { stage = Size(it.width.toFloat(), it.height.toFloat()) }
-            .drawBehind { drawToggleContent(progress.value, label) },
+            .drawBehind { drawGroove(thumbP.value, pillP.value, labels) },
     ) {
         Box(
             Modifier
                 .offset {
-                    val left = thumbLeft(progress.value, stage.width)
-                    IntOffset(left.toInt(), ((stage.height - ThumbH.toPx()) / 2f).toInt())
+                    IntOffset(thumbLeft(thumbP.value, stage.width).toInt(), ((stage.height - ThumbH.toPx()) / 2f).toInt())
                 }
                 .size(ThumbW, ThumbH)
-                .clip(RoundedCornerShape(50))
-                .border(
-                    1.5.dp,
-                    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.15f))),
-                    RoundedCornerShape(50),
-                ),
+                .clip(RoundedCornerShape(50)),
         ) {
-            // The blurred copy: the stage's light drawn again, shifted back under the thumb, in a
-            // layer larger than the thumb so the blur has real neighbours at the edge; the thumb's
-            // clip trims it.
-            val margin = 30.dp
             Box(
                 Modifier
                     .align(Alignment.Center)
                     .requiredSize(ThumbW + margin * 2, ThumbH + margin * 2)
                     .graphicsLayer {
-                        val blur = 9.dp.toPx()
+                        val blur = 11.dp.toPx() * 0.6f
                         renderEffect = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.DECAL)
                             .asComposeRenderEffect()
                     }
                     .drawBehind {
-                        val left = thumbLeft(progress.value, stage.width) - margin.toPx()
+                        val left = thumbLeft(thumbP.value, stage.width) - margin.toPx()
                         val top = (stage.height - ThumbH.toPx()) / 2f - margin.toPx()
-                        translate(-left, -top) { drawToggleContent(progress.value, label, stage) }
+                        translate(-left, -top) { drawGroove(thumbP.value, pillP.value, labels, stage) }
                     },
             )
-            // tint, bevel, dots
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawWithCache {
-                        val tint = Color(0xFFEBEBF2).copy(alpha = 0.10f)
-                        val bevel = Brush.linearGradient(
-                            listOf(Color.White.copy(alpha = 0.45f), Color.Transparent, Color.Black.copy(alpha = 0.25f)),
-                            Offset.Zero, Offset(size.width * 0.35f, size.height),
-                        )
-                        val dot = 3.2.dp.toPx()
-                        val cell = 16.dp.toPx()
-                        onDrawBehind {
-                            drawRect(tint)
-                            drawRoundRect(bevel, cornerRadius = CornerRadius(size.height / 2f), style = Stroke(14.dp.toPx()))
-                            var y = cell * 2.5f
-                            while (y < size.height - 30.dp.toPx()) {
-                                var x = cell * 2.5f
-                                while (x < 105.dp.toPx()) {
-                                    drawCircle(Color.White.copy(alpha = 0.22f), dot, Offset(x, y))
-                                    x += cell
-                                }
-                                y += cell
-                            }
+            Box(Modifier.fillMaxSize().drawWithCache {
+                val tint = Color(0xFFEDEDF5).copy(alpha = 0.13f)
+                val bevel = Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.50f), Color.Transparent, Color.Black.copy(alpha = 0.20f)),
+                    Offset.Zero, Offset(size.width * 0.3f, size.height),
+                )
+                val dot = 3.2.dp.toPx()
+                val cell = 16.dp.toPx()
+                val capR = CapD.toPx() / 2f
+                val capC = Offset(size.width - size.height / 2f, size.height / 2f)
+                val cap = Path().apply { addOval(androidx.compose.ui.geometry.Rect(capC, capR)) }
+                onDrawBehind {
+                    drawRect(tint)
+                    drawRoundRect(bevel, cornerRadius = CornerRadius(size.height / 2f), style = Stroke(12.dp.toPx()))
+                    drawRoundRect(
+                        Color.White.copy(alpha = 0.35f), cornerRadius = CornerRadius(size.height / 2f),
+                        style = Stroke(1.6.dp.toPx()),
+                    )
+                    var y = cell * 2.25f
+                    while (y < size.height - 28.dp.toPx()) {
+                        var x = cell * 2.25f
+                        while (x < 104.dp.toPx()) {
+                            drawCircle(Color.White.copy(alpha = 0.22f), dot, Offset(x, y))
+                            x += cell
                         }
-                    },
-            )
+                        y += cell
+                    }
+                    clipPath(cap) {
+                        drawCircle(Color(0xFFDBCCCC).copy(alpha = 0.28f), capR, capC)
+                        var s = -capR * 2
+                        while (s < capR * 2) {
+                            drawLine(
+                                Color.White.copy(alpha = 0.06f),
+                                Offset(capC.x + s - capR, capC.y + capR), Offset(capC.x + s + capR, capC.y - capR),
+                                strokeWidth = 3.5.dp.toPx(),
+                            )
+                            s += 7.dp.toPx()
+                        }
+                    }
+                    drawCircle(Color.White.copy(alpha = 0.18f), capR, capC, style = Stroke(1.5.dp.toPx()))
+                }
+            })
         }
     }
 }
