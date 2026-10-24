@@ -55,7 +55,9 @@ private val CardColors = listOf(
 @Composable
 private fun CardList(modifier: Modifier) {
     LazyColumn(
-        modifier = modifier,
+        // the page color is part of the list: glass bends only what is in the backdrop's
+        // layer, and a gap between cards would otherwise come through it as plain black
+        modifier = modifier.background(Color(0xFF101114)),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
