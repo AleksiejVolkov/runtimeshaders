@@ -11,6 +11,7 @@ plugins {
 android {
     namespace = "com.offmind.runtimeshaders"
     compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "com.offmind.runtimeshaders"
