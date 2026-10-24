@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -42,11 +43,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -62,7 +58,7 @@ private val StageH = 200.dp
 private val TrackW = 300.dp
 private val TrackH = 96.dp
 private val PillW = 222.dp   // longer than the thumb: it always peeks out on one side
-private val PillH = 64.dp
+private val PillH = 80.dp   // 8 dp from the groove's edge
 private val ThumbW = 214.dp
 private val ThumbH = 112.dp
 private val CapD = 84.dp
@@ -87,49 +83,33 @@ private fun Density.pillLeft(p: Float, stageW: Float): Float {
     return from + (to - from) * p
 }
 
-private class ToggleLabels(val on: TextLayoutResult, val off: TextLayoutResult)
-
-@Composable
-private fun rememberToggleLabels(): ToggleLabels {
-    val measurer = rememberTextMeasurer()
-    return remember(measurer) {
-        val style = TextStyle(color = Color(0xFFC9CBD2), fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-        ToggleLabels(measurer.measure("ON", style), measurer.measure("OFF", style))
-    }
-}
-
-/** Groove, labels and the active pill with its glow — what the glass sits on, in stage px. */
-private fun DrawScope.drawGroove(thumbP: Float, pillP: Float, labels: ToggleLabels, stage: Size = size) {
+/** The groove and its active pill with the glow, clipped to the groove — in stage px. */
+private fun DrawScope.drawGroove(pillP: Float, colorP: Float, stage: Size = size) {
     val left = trackLeft(stage.width)
     val top = (stage.height - TrackH.toPx()) / 2f
     val r = TrackH.toPx() / 2f
-    drawRoundRect(Color(0xFF141519), Offset(left, top), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r))
-    drawRoundRect(
-        Color(0xFF3A3C44), Offset(left, top), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r),
-        style = Stroke(6.dp.toPx()),
-    )
-    // the active pill: orange and glowing when on, dark grey when off
+    val groove = Path().apply {
+        addRoundRect(RoundRect(left, top, left + TrackW.toPx(), top + TrackH.toPx(), CornerRadius(r)))
+    }
+    drawPath(groove, Color(0xFF141519))
+    // the active pill: it slides on its own; its color fades on its own, orange ↔ dark grey
     val pl = pillLeft(pillP, stage.width)
     val pt = (stage.height - PillH.toPx()) / 2f
     val pc = Offset(pl + PillW.toPx() / 2f, stage.height / 2f)
-    val glow = 110.dp.toPx()
-    drawCircle(
-        Brush.radialGradient(listOf(Orange.copy(alpha = 0.55f * pillP), Color.Transparent), pc, glow),
-        glow, pc,
-    )
-    drawRoundRect(
-        Brush.horizontalGradient(
-            listOf(lerp(PillOff, Amber, pillP), lerp(PillOff, Orange, pillP)), startX = pl, endX = pl + PillW.toPx(),
-        ),
-        Offset(pl, pt), Size(PillW.toPx(), PillH.toPx()), CornerRadius(PillH.toPx() / 2f),
-    )
-    val labelY = (stage.height - labels.on.size.height) / 2f
-    drawText(labels.on, topLeft = Offset(left + 24.dp.toPx(), labelY), alpha = thumbP)
-    drawText(
-        labels.off,
-        topLeft = Offset(left + TrackW.toPx() - 40.dp.toPx() - labels.off.size.width, labelY),
-        alpha = 1f - thumbP,
-    )
+    clipPath(groove) {
+        val glow = 110.dp.toPx()
+        drawCircle(
+            Brush.radialGradient(listOf(Orange.copy(alpha = 0.55f * colorP), Color.Transparent), pc, glow),
+            glow, pc,
+        )
+        drawRoundRect(
+            Brush.horizontalGradient(
+                listOf(lerp(PillOff, Amber, colorP), lerp(PillOff, Orange, colorP)), startX = pl, endX = pl + PillW.toPx(),
+            ),
+            Offset(pl, pt), Size(PillW.toPx(), PillH.toPx()), CornerRadius(PillH.toPx() / 2f),
+        )
+    }
+    drawPath(groove, Color(0xFF3A3C44), style = Stroke(2.dp.toPx()))
 }
 
 @Language("AGSL")
@@ -157,9 +137,9 @@ half4 main(float2 p) {
 
     float2 e = float2(1.0, 0.0);
     float2 n = normalize(float2(sd(p + e.xy) - sd(p - e.xy), sd(p + e.yx) - sd(p - e.yx)));
-    float rim = 1.0 - clamp(-d / (12.0 * dp), 0.0, 1.0);
+    float rim = 1.0 - clamp(-d / (18.0 * dp), 0.0, 1.0);
     // a thick sheet of glass: the rim bends what is under it towards the centre
-    half3 glass = content.eval(p - n * rim * rim * 10.0 * dp).rgb;
+    half3 glass = content.eval(p - n * rim * rim * 26.0 * dp).rgb;
     glass = mix(glass, half3(0.93, 0.93, 0.96), 0.13);
     float lit = dot(n, normalize(float2(-1.0, -1.3)));
     glass += half3(0.45) * half(rim * rim * max(lit, 0.0));
@@ -193,8 +173,8 @@ half4 main(float2 p) {
         float spec = pow(max(dot(nb, normalize(l + float3(0.0, 0.0, 1.0))), 0.0), 90.0);
         half3 seen = content.eval(p + q * rc * 0.35 * (1.0 - z)).rgb;   // spread outwards: minifies
         half3 dish = mix(seen, half3(0.90, 0.88, 0.90), 0.22);
-        dish *= half(0.62 + 0.55 * diffuse);
-        dish += half3(0.85) * half(spec * 0.4);
+        dish *= half(0.82 + 0.32 * diffuse);
+        dish += half3(0.85) * half(spec * 0.22);
         float stripes = 0.5 + 0.5 * sin((local.x + local.y) * 0.9 / dp);
         dish += half3(0.035) * half(stripes);
         glass = dish;
@@ -203,7 +183,7 @@ half4 main(float2 p) {
     float lip = smoothstep(2.2 * dp, 0.0, abs(rr - 1.0) * rc);
     float lipLight = dot(normalize(q + 1e-4), normalize(float2(-1.0, -1.3)));
     glass += half3(0.45) * half(lip * max(-lipLight, 0.0));
-    glass *= half(1.0 - lip * max(lipLight, 0.0) * 0.45);
+    glass *= half(1.0 - lip * max(lipLight, 0.0) * 0.25);
 
     return half4(glass, 1.0) * half(clamp(0.5 - d, 0.0, 1.0));
 }
@@ -219,6 +199,7 @@ internal fun GlassToggleVersusScreen() {
     var impl by rememberSaveable { mutableStateOf(ToggleImpl.Shader) }
     val thumb = remember { Animatable(0f) }
     val pill = remember { Animatable(0f) }
+    val color = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         var on = false
         while (true) {
@@ -228,6 +209,7 @@ internal fun GlassToggleVersusScreen() {
             // two parts, two speeds: the pill in the groove is quicker than the glass above it
             launch { thumb.animateTo(target, tween(780, easing = FastOutSlowInEasing)) }
             launch { pill.animateTo(target, tween(420, easing = LinearOutSlowInEasing)) }
+            launch { color.animateTo(target, tween(650, easing = FastOutSlowInEasing)) }
         }
     }
     val frames by rememberFrameSummary("screen=vs-toggle variant=${impl.name}")
@@ -242,8 +224,8 @@ internal fun GlassToggleVersusScreen() {
         Text(alloc?.toDisplay() ?: "", style = MonoSmall.copy(color = EngineDim))
         val stage = Modifier.fillMaxWidth().height(StageH)
         when (impl) {
-            ToggleImpl.Shader -> ShaderToggle(thumb.asState(), pill.asState(), stage)
-            ToggleImpl.NoShader -> CopyToggle(thumb.asState(), pill.asState(), stage)
+            ToggleImpl.Shader -> ShaderToggle(thumb.asState(), pill.asState(), color.asState(), stage)
+            ToggleImpl.NoShader -> CopyToggle(thumb.asState(), pill.asState(), color.asState(), stage)
         }
         Text(
             if (impl == ToggleImpl.Shader) "the groove again under the thumb → RenderEffect chain: platform blur, then the glass shader (rim lens, bevel, concave cap)"
@@ -255,15 +237,14 @@ internal fun GlassToggleVersusScreen() {
 }
 
 @Composable
-private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modifier) {
-    val labels = rememberToggleLabels()
+private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, colorP: State<Float>, modifier: Modifier) {
     val shader = remember { newRuntimeShader(GLASS_SHADER) }
     var stage by remember { mutableStateOf(Size.Zero) }
     val margin = 30.dp
     Box(
         modifier
             .onSizeChanged { stage = Size(it.width.toFloat(), it.height.toFloat()) }
-            .drawBehind { drawGroove(thumbP.value, pillP.value, labels) },
+            .drawBehind { drawGroove(pillP.value, colorP.value) },
     ) {
         // The groove again under the thumb, in a layer a little wider than the thumb. Its effect is
         // a chain: the platform blur first, then the glass shader over the blurred result.
@@ -289,7 +270,7 @@ private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Mo
                 .drawBehind {
                     val left = thumbLeft(thumbP.value, stage.width) - margin.toPx()
                     val top = (stage.height - ThumbH.toPx()) / 2f - margin.toPx()
-                    translate(-left, -top) { drawGroove(thumbP.value, pillP.value, labels, stage) }
+                    translate(-left, -top) { drawGroove(pillP.value, colorP.value, stage) }
                 },
         )
     }
@@ -302,14 +283,13 @@ private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Mo
  * dots and the striped cap on top. It frosts; it cannot bend light at the rim.
  */
 @Composable
-private fun CopyToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modifier) {
-    val labels = rememberToggleLabels()
+private fun CopyToggle(thumbP: State<Float>, pillP: State<Float>, colorP: State<Float>, modifier: Modifier) {
     var stage by remember { mutableStateOf(Size.Zero) }
     val margin = 30.dp
     Box(
         modifier
             .onSizeChanged { stage = Size(it.width.toFloat(), it.height.toFloat()) }
-            .drawBehind { drawGroove(thumbP.value, pillP.value, labels) },
+            .drawBehind { drawGroove(pillP.value, colorP.value) },
     ) {
         Box(
             Modifier
@@ -331,7 +311,7 @@ private fun CopyToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modi
                     .drawBehind {
                         val left = thumbLeft(thumbP.value, stage.width) - margin.toPx()
                         val top = (stage.height - ThumbH.toPx()) / 2f - margin.toPx()
-                        translate(-left, -top) { drawGroove(thumbP.value, pillP.value, labels, stage) }
+                        translate(-left, -top) { drawGroove(pillP.value, colorP.value, stage) }
                     },
             )
             Box(Modifier.fillMaxSize().drawWithCache {
