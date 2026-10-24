@@ -2,24 +2,30 @@ package com.offmind.runtimeshaders.screens.effects.glassrefraction
 
 import android.graphics.BlendMode
 import android.graphics.RenderEffect
+import android.graphics.RenderNode
 import android.graphics.RuntimeShader
 import android.graphics.Shader
+import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import org.intellij.lang.annotations.Language
+import kotlin.math.roundToInt
 
 // Where the glass is. The panel writes it, the backdrop reads it.
 class GlassPanel {
@@ -84,6 +90,47 @@ fun Modifier.glassBackdrop(
                 .createBlendModeEffect(backdrop, cut, BlendMode.SRC_OVER)
                 .asComposeRenderEffect()
         }
+}
+
+// Android 37.2 gives this to every view: setBackdropRenderEffect hands the effect the pixels
+// already drawn behind the node.
+val PlatformBackdropAvailable: Boolean = Build.VERSION.SDK_INT >= 36 &&
+    Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.CINNAMON_BUN_2
+
+// The same glass, drawn by the panel itself:
+// no backdrop modifier, no positions to pass around.
+fun Modifier.platformGlass(cornerRadius: Dp, frosted: Boolean = false): Modifier = composed {
+    val node = remember { RenderNode("glass") }
+    val glass = remember { RuntimeShader(glassShader) }
+    drawBehind {
+        // one panel, and it starts at the node's own corner
+        val bounds = FloatArray(MaxGlassPanels * 4)
+        bounds[2] = size.width
+        bounds[3] = size.height
+        val cornerRadii = FloatArray(MaxGlassPanels)
+        cornerRadii[0] = cornerRadius.toPx()
+        glass.setFloatUniform("panels", bounds)
+        glass.setFloatUniform("cornerRadii", cornerRadii)
+        glass.setFloatUniform("panelCount", 1f)
+        glass.setFloatUniform("thickness", Thickness.toPx())
+        glass.setFloatUniform("bevel", Bevel.toPx())
+        glass.setFloatUniform("ior", IndexOfRefraction)
+
+        var effect = RenderEffect.createRuntimeShaderEffect(glass, "image")
+        if (frosted) {
+            val radius = FrostRadius.toPx()
+            val blur = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+            effect = RenderEffect.createChainEffect(effect, blur)
+        }
+        val width = size.width.roundToInt()
+        val height = size.height.roundToInt()
+        node.setPosition(0, 0, width, height)
+        node.setBackdropRenderEffect(effect)
+        // the node draws nothing of its own: all it brings to the screen is its backdrop
+        node.beginRecording(width, height).drawColor(android.graphics.Color.TRANSPARENT)
+        node.endRecording()
+        drawIntoCanvas { it.nativeCanvas.drawRenderNode(node) }
+    }
 }
 
 // Changes nothing: the backdrop goes through a shader and comes out as it was.

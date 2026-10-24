@@ -53,10 +53,16 @@ fun GlassRefractionScreen() {
         val player = remember { GlassPanel() }
         val panels = listOf(card, toolbar, button, player)
         var frosted by remember { mutableStateOf(false) }
-        var useHaze by remember { mutableStateOf(false) }
+        var mode by remember { mutableStateOf(GlassMode.Backdrop) }
+        val useHaze = mode == GlassMode.Haze
         val hazeState = rememberHazeState()
-        // the same screen two ways: our glass on the backdrop, or Haze's glass on every panel
-        val haze = if (useHaze) GlassHaze(hazeState, frosted) else null
+        // the same screen three ways: our glass on the backdrop, Haze's glass on every panel,
+        // or the platform's backdrop effect on every panel
+        val panelGlass = when (mode) {
+            GlassMode.Backdrop -> null
+            GlassMode.Haze -> PanelGlass.Haze(hazeState, frosted)
+            GlassMode.Platform -> PanelGlass.Platform(frosted)
+        }
         // Haze records the list only while the list draws, and a list that stands still does
         // not draw again: without one more frame the new glass would have nothing to show.
         var redraws by remember { mutableIntStateOf(0) }
@@ -65,29 +71,32 @@ fun GlassRefractionScreen() {
             redraws++
         }
         CardList(
-            if (haze != null) {
-                Modifier.fillMaxSize().hazeSource(hazeState).drawBehind { redraws }
-            } else {
-                Modifier.fillMaxSize().glassBackdrop(panels, frosted)
+            when (mode) {
+                GlassMode.Backdrop -> Modifier.fillMaxSize().glassBackdrop(panels, frosted)
+                GlassMode.Haze -> Modifier
+                    .fillMaxSize()
+                    .hazeSource(hazeState)
+                    .drawBehind { redraws }
+                GlassMode.Platform -> Modifier.fillMaxSize()
             }
         )
 
         GlassBox(
-            card, 36.dp, haze,
+            card, 36.dp, panelGlass,
             Modifier.align(Alignment.Center).size(width = 320.dp, height = 220.dp),
         )
         GlassBox(
-            toolbar, 36.dp, haze,
+            toolbar, 36.dp, panelGlass,
             Modifier.statusBarsPadding().padding(16.dp).fillMaxWidth().height(72.dp),
         ) {
             Text("Cards", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
         GlassBox(
-            button, 48.dp, haze,
+            button, 48.dp, panelGlass,
             Modifier.align(Alignment.TopEnd).padding(top = 190.dp, end = 24.dp).size(96.dp),
         )
         GlassBox(
-            player, 28.dp, haze,
+            player, 28.dp, panelGlass,
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -106,35 +115,48 @@ fun GlassRefractionScreen() {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Chip(text = if (frosted) "frosted" else "clear", onClick = { frosted = !frosted })
-            Chip(text = if (useHaze) "Haze" else "backdrop", onClick = { useHaze = !useHaze })
+            Chip(text = mode.label, onClick = { mode = mode.next() })
         }
     }
 }
 
-private class GlassHaze(val state: HazeState, val frosted: Boolean)
+private enum class GlassMode(val label: String) {
+    Backdrop("backdrop"), Haze("Haze"), Platform("Android 37.2");
+
+    fun next(): GlassMode {
+        val modes = entries.filter { it != Platform || PlatformBackdropAvailable }
+        return modes[(modes.indexOf(this) + 1) % modes.size]
+    }
+}
+
+// Glass drawn by the panel itself, not by the backdrop.
+private sealed interface PanelGlass {
+    class Haze(val state: HazeState, val frosted: Boolean) : PanelGlass
+    class Platform(val frosted: Boolean) : PanelGlass
+}
 
 // The panel draws only its outline and its own content; the glass under it is drawn by the
-// backdrop. With Haze it is the other way round: the panel replays the list and draws the
+// backdrop. With Haze and on Android 37.2 it is the other way round: the panel draws the
 // glass.
 @Composable
 private fun GlassBox(
     panel: GlassPanel,
     cornerRadius: Dp,
-    haze: GlassHaze?,
+    panelGlass: PanelGlass?,
     modifier: Modifier,
     content: @Composable () -> Unit = {},
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    val glass = if (haze != null) {
-        Modifier.hazeGlass(
-            input = HazeInput.Sources(haze.state),
+    val glass = when (panelGlass) {
+        is PanelGlass.Haze -> Modifier.hazeGlass(
+            input = HazeInput.Sources(panelGlass.state),
             style = GlassStyle {
                 shape(shape)
-                optics(blurRadius = if (haze.frosted) FrostRadius else 0.dp)
+                optics(blurRadius = if (panelGlass.frosted) FrostRadius else 0.dp)
             },
         ).clip(shape)
-    } else {
-        Modifier
+        is PanelGlass.Platform -> Modifier.platformGlass(cornerRadius, panelGlass.frosted)
+        null -> Modifier
     }
     Box(
         modifier
