@@ -53,7 +53,6 @@ import org.intellij.lang.annotations.Language
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 // The particle model, the same on both sides. The bubble is cut into square cells; each cell
@@ -68,9 +67,9 @@ private val DirY = -1f / sqrt(0.55f * 0.55f + 1f)
 
 private fun fract(x: Float) = x - floor(x)
 
-/** Per-cell random number in 0…1, the same formula as `hash` in the shader. */
+/** Per-cell random number in 0…1 (no sine: cheap on the GPU), the same formula as `hash` in the shader. */
 private fun hash(cx: Float, cy: Float, k: Float) =
-    fract(sin(cx * (127.1f + k) + cy * (311.7f - k)) * 43758.5453f)
+    fract(52.9829189f * fract(cx * 0.06711056f + cy * 0.00583715f + k * 0.1234f))
 
 @Language("AGSL")
 private const val DUST_SHADER = """
@@ -81,10 +80,17 @@ uniform float maxDrift;   // longest flight, px
 uniform float t;          // timeline, 0 … 1.12
 uniform float2 dir;       // flight direction (unit)
 
-float hash(float2 c, float k) { return fract(sin(dot(c, float2(127.1 + k, 311.7 - k))) * 43758.5453); }
+float hash(float2 c, float k) {
+    return fract(52.9829189 * fract(c.x * 0.06711056 + c.y * 0.00583715 + k * 0.1234));
+}
 
 half4 main(float2 p) {
     if (t >= 1.12) return half4(0);
+    // Before the sweep starts nothing has moved: the bubble is itself.
+    if (t <= 0.0) return content.eval(p);
+    // No particle can reach outside the bubble grown by the longest flight: skip those pixels.
+    if (p.x < rect.x - cell || p.x > rect.z + maxDrift * dir.x + cell ||
+        p.y < rect.y + maxDrift * dir.y - cell || p.y > rect.w + cell) return half4(0);
     float2 perp = float2(-dir.y, dir.x);
     // A pixel cannot push a particle; it can only ask "which particle has landed on me?".
     // Walk back along the flight direction and test each cell met on the way.
