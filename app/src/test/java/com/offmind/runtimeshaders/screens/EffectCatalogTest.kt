@@ -22,7 +22,7 @@ class EffectCatalogTest {
             "canvas-deform", "metaballs", "lamp-shadow", "snowed-dialog", "burn-after-reading",
             "navigation-test", "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area",
             "engine-shader-cost", "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion",
-            "engine-vs-dust",
+            "engine-vs-dust", "engine-vs-edgefade", "engine-vs-normalmap",
         )
         assertEquals(expectedIds, ids.toSet())
         assertEquals(expectedIds.size, ids.size)
@@ -53,6 +53,7 @@ class EffectCatalogTest {
             listOf(
                 "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost",
                 "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion", "engine-vs-dust",
+                "engine-vs-edgefade", "engine-vs-normalmap",
             ),
             effectsCatalog.category("compose-engine").children.map { it.id },
         )

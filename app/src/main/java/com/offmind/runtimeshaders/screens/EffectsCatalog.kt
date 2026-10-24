@@ -18,8 +18,10 @@ import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DistortionVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DustVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.EdgeFadeVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.NormalMapVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
@@ -241,6 +243,16 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Dust · with and without a shader",
                         description = "A message bubble turns into dust: per-pixel gather or CPU particles",
                     ) { DustVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-edgefade",
+                        title = "Edge fade · with and without a shader",
+                        description = "A list that dissolves at its edges with a cubic falloff",
+                    ) { EdgeFadeVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-normalmap",
+                        title = "Normal map · with and without a shader",
+                        description = "Scratched steel under a moving light: per-pixel lighting or a color matrix",
+                    ) { NormalMapVersusScreen() },
                 ),
             ),
         ),
