@@ -60,6 +60,11 @@ internal enum class GlowFix(val label: String, val note: String) {
         "3 · remember brush",
         "shader and brush remembered · time read in drawBehind only",
     ),
+    // A trap, not a step: off the fix path, shown last.
+    FrozenBrush(
+        "✗ brush remembered, read in composition",
+        "brush remembered but uniform still set in composition · nothing re-records · the glow freezes",
+    ),
 }
 
 private enum class GlowLayout(val label: String) { Both("Both"), Left("Left only"), Right("Right only") }
@@ -95,6 +100,7 @@ internal fun GlowButtonsScreen() {
                         GlowFix.RememberShader -> RememberedShaderGlowPanel(left)
                         GlowFix.ReadInDraw -> DrawReadGlowPanel(left)
                         GlowFix.Fixed -> FixedGlowPanel(left)
+                        GlowFix.FrozenBrush -> FrozenBrushGlowPanel(left)
                     }
                     if (readouts) GlowReadouts(left)
                 }
@@ -184,6 +190,33 @@ private fun RememberedShaderGlowPanel(counters: GlowCounters) {
                 .clip(ButtonShape)
                 .countDraw(counters.button)
                 .background(ShaderBrush(shader)),
+            contentAlignment = Alignment.Center,
+        ) { Text("Play", color = Color.White) }
+        DeviceChips(Devices.map { it.label }, counters.chips)
+    }
+}
+
+@Composable
+private fun FrozenBrushGlowPanel(counters: GlowCounters) {
+    counters.panel.compositions++
+    val t by rememberInfiniteTransition(label = "glow")
+        .animateFloat(0f, 1f, infiniteRepeatable(tween(2000, easing = LinearEasing)), label = "t")
+    val density = LocalDensity.current
+    val shader = remember { newRuntimeShader(GLOW_SHADER, counters.panel) }
+    val brush = remember(shader) { ShaderBrush(shader) }
+    shader.setFloatUniform("time", t) // still in composition: the recorded draw keeps the old value
+    with(density) { shader.setFloatUniform("size", ButtonWidth.toPx(), ButtonHeight.toPx()) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PanelTitle(shader, counters.dot)
+        Box(
+            modifier = Modifier
+                .countLayout(counters.button)
+                .width(ButtonWidth)
+                .height(ButtonHeight)
+                .clip(ButtonShape)
+                .countDraw(counters.button)
+                .background(brush), // the same brush: the background node sees no change
             contentAlignment = Alignment.Center,
         ) { Text("Play", color = Color.White) }
         DeviceChips(Devices.map { it.label }, counters.chips)
