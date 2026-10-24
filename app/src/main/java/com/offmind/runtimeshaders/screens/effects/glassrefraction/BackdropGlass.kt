@@ -3,6 +3,7 @@ package com.offmind.runtimeshaders.screens.effects.glassrefraction
 import android.graphics.BlendMode
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
+import android.graphics.Shader
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +37,11 @@ fun Modifier.glassPanel(panel: GlassPanel, cornerRadius: Dp): Modifier = onGloba
 private val Thickness = 70.dp
 private val Bevel = 100.dp
 private const val IndexOfRefraction = 1.5f // glass
+private val FrostRadius = 16.dp
 
 // The glass is drawn by the backdrop, not by the panel: this layer already has every pixel
 // the glass needs to bend.
-fun Modifier.glassBackdrop(panel: GlassPanel): Modifier = composed {
+fun Modifier.glassBackdrop(panel: GlassPanel, frosted: Boolean = false): Modifier = composed {
     val identity = remember { RuntimeShader(identityShader) }
     val glass = remember { RuntimeShader(glassShader) }
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -55,7 +57,13 @@ fun Modifier.glassBackdrop(panel: GlassPanel): Modifier = composed {
             glass.setFloatUniform("ior", IndexOfRefraction)
 
             val backdrop = RenderEffect.createRuntimeShaderEffect(identity, "image")
-            val cut = RenderEffect.createRuntimeShaderEffect(glass, "image")
+            var cut = RenderEffect.createRuntimeShaderEffect(glass, "image")
+            if (frosted) {
+                // the glass now bends an already blurred backdrop
+                val radius = FrostRadius.toPx()
+                val blur = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+                cut = RenderEffect.createChainEffect(cut, blur)
+            }
             // the glass, laid over the untouched backdrop
             renderEffect = RenderEffect
                 .createBlendModeEffect(backdrop, cut, BlendMode.SRC_OVER)

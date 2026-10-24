@@ -2,6 +2,7 @@ package com.offmind.runtimeshaders.screens.effects.glassrefraction
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +10,17 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +35,8 @@ import androidx.compose.ui.unit.sp
 fun GlassRefractionScreen() {
     Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
         val panel = remember { GlassPanel() }
-        CardList(Modifier.fillMaxSize().glassBackdrop(panel))
+        var frosted by remember { mutableStateOf(false) }
+        CardList(Modifier.fillMaxSize().glassBackdrop(panel, frosted))
 
         Box(
             Modifier
@@ -39,7 +45,30 @@ fun GlassRefractionScreen() {
                 .glassPanel(panel, cornerRadius = 36.dp)
                 .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
         )
+
+        Chip(
+            text = if (frosted) "frosted" else "clear",
+            onClick = { frosted = !frosted },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp),
+        )
     }
+}
+
+@Composable
+private fun Chip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        color = Color.White,
+        fontSize = 18.sp,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xCC101114))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 12.dp),
+    )
 }
 
 private val CardColors = listOf(
