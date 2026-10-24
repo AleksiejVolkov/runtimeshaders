@@ -61,7 +61,7 @@ import org.intellij.lang.annotations.Language
 private val StageH = 200.dp
 private val TrackW = 300.dp
 private val TrackH = 96.dp
-private val PillW = 128.dp
+private val PillW = 222.dp   // longer than the thumb: it always peeks out on one side
 private val PillH = 64.dp
 private val ThumbW = 214.dp
 private val ThumbH = 112.dp
@@ -79,10 +79,11 @@ private fun Density.thumbLeft(p: Float, stageW: Float): Float {
     return from + (to - from) * p
 }
 
-/** The active pill's left edge, px: a shorter path than the thumb's, on its own timing. */
+/** The active pill's left edge, px: from the groove's left end to its right end, on its own timing. */
 private fun Density.pillLeft(p: Float, stageW: Float): Float {
-    val from = trackLeft(stageW) + 16.dp.toPx()
-    val to = trackLeft(stageW) + 74.dp.toPx() // on: peeks out from under the glass
+    val inset = (TrackH.toPx() - PillH.toPx()) / 2f
+    val from = trackLeft(stageW) + inset
+    val to = trackLeft(stageW) + TrackW.toPx() - inset - PillW.toPx()
     return from + (to - from) * p
 }
 
@@ -107,13 +108,6 @@ private fun DrawScope.drawGroove(thumbP: Float, pillP: Float, labels: ToggleLabe
         Color(0xFF3A3C44), Offset(left, top), Size(TrackW.toPx(), TrackH.toPx()), CornerRadius(r),
         style = Stroke(6.dp.toPx()),
     )
-    val labelY = (stage.height - labels.on.size.height) / 2f
-    drawText(labels.on, topLeft = Offset(left + 24.dp.toPx(), labelY), alpha = thumbP)
-    drawText(
-        labels.off,
-        topLeft = Offset(left + TrackW.toPx() - 40.dp.toPx() - labels.off.size.width, labelY),
-        alpha = 1f - thumbP,
-    )
     // the active pill: orange and glowing when on, dark grey when off
     val pl = pillLeft(pillP, stage.width)
     val pt = (stage.height - PillH.toPx()) / 2f
@@ -129,12 +123,21 @@ private fun DrawScope.drawGroove(thumbP: Float, pillP: Float, labels: ToggleLabe
         ),
         Offset(pl, pt), Size(PillW.toPx(), PillH.toPx()), CornerRadius(PillH.toPx() / 2f),
     )
+    val labelY = (stage.height - labels.on.size.height) / 2f
+    drawText(labels.on, topLeft = Offset(left + 24.dp.toPx(), labelY), alpha = thumbP)
+    drawText(
+        labels.off,
+        topLeft = Offset(left + TrackW.toPx() - 40.dp.toPx() - labels.off.size.width, labelY),
+        alpha = 1f - thumbP,
+    )
 }
 
 @Language("AGSL")
 private const val GLASS_SHADER = """
+// Runs after a platform blur (RenderEffect chain): `content` is the groove under the thumb,
+// already frosted. This pass shapes it into glass: rim lens, bevel, dots and a concave cap.
 uniform shader content;
-uniform float4 thumb;     // left, top, right, bottom (px)
+uniform float4 thumb;     // left, top, right, bottom in this layer (px)
 uniform float dp;         // px per dp
 
 float box(float2 p, float2 b, float r) {
@@ -148,27 +151,15 @@ float sd(float2 p) {
     return box(p - c, h, h.y);
 }
 
-// 16 taps on a golden-angle spiral: a soft disk blur of what lies under the glass
-half3 frosted(float2 q, float radius) {
-    half3 acc = half3(0.0);
-    for (int i = 0; i < 16; i++) {
-        float a = float(i) * 2.39996;
-        float rr = sqrt((float(i) + 0.5) / 16.0) * radius;
-        acc += content.eval(q + float2(cos(a), sin(a)) * rr).rgb;
-    }
-    return acc / 16.0;
-}
-
 half4 main(float2 p) {
-    half4 under = content.eval(p);
     float d = sd(p);
-    if (d > 1.0) return under;
+    if (d > 1.0) return half4(0.0);   // outside the thumb: the sharp groove below shows through
 
     float2 e = float2(1.0, 0.0);
     float2 n = normalize(float2(sd(p + e.xy) - sd(p - e.xy), sd(p + e.yx) - sd(p - e.yx)));
     float rim = 1.0 - clamp(-d / (12.0 * dp), 0.0, 1.0);
-    // a thick sheet of glass: the rim bends what is under it a little towards the centre
-    half3 glass = frosted(p - n * rim * rim * 8.0 * dp, 11.0 * dp);
+    // a thick sheet of glass: the rim bends what is under it towards the centre
+    half3 glass = content.eval(p - n * rim * rim * 10.0 * dp).rgb;
     glass = mix(glass, half3(0.93, 0.93, 0.96), 0.13);
     float lit = dot(n, normalize(float2(-1.0, -1.3)));
     glass += half3(0.45) * half(rim * rim * max(lit, 0.0));
@@ -186,15 +177,35 @@ half4 main(float2 p) {
         float shade = dot(normalize(dd + 1e-3), normalize(float2(-1.0, -1.0)));
         glass += half3(0.22) * half(smoothstep(1.0, -1.0, dot_) * (0.45 + 0.55 * shade));
     }
-    // the round cap at the trailing end: lighter glass with diagonal stripes
-    float2 capC = float2(thumb.z - thumb.x - h * 0.5, h * 0.5);
-    float capD = length(local - capC) - 42.0 * dp;
-    if (capD < 0.0) {
+
+    // The cap: a concave dish pressed into the glass. Its normal leans towards the dish's centre,
+    // so with the light from the top left the lower-right wall is lit and the upper-left wall is
+    // in shade; the dish also acts as a concave lens on what is seen through it.
+    float rc = 42.0 * dp;
+    float2 capC = thumb.xy + float2(thumb.z - thumb.x - h * 0.5, h * 0.5);
+    float2 q = (p - capC) / rc;
+    float rr = length(q);
+    if (rr < 1.0) {
+        float z = sqrt(1.0 - rr * rr);
+        float3 nb = normalize(float3(-q * 0.85, z));
+        float3 l = normalize(float3(-0.55, -0.75, 0.9));
+        float diffuse = dot(nb, l);
+        float spec = pow(max(dot(nb, normalize(l + float3(0.0, 0.0, 1.0))), 0.0), 90.0);
+        half3 seen = content.eval(p + q * rc * 0.35 * (1.0 - z)).rgb;   // spread outwards: minifies
+        half3 dish = mix(seen, half3(0.90, 0.88, 0.90), 0.22);
+        dish *= half(0.62 + 0.55 * diffuse);
+        dish += half3(0.85) * half(spec * 0.4);
         float stripes = 0.5 + 0.5 * sin((local.x + local.y) * 0.9 / dp);
-        glass = mix(glass, half3(0.86, 0.80, 0.80), 0.28) + half3(0.05) * half(stripes);
+        dish += half3(0.035) * half(stripes);
+        glass = dish;
     }
-    glass += half3(0.18) * half(smoothstep(1.5 * dp, 0.0, abs(capD)));
-    return mix(under, half4(glass, 1.0), half(clamp(0.5 - d, 0.0, 1.0)));
+    // the dish's lip: bright where it faces the light, dark where it turns away
+    float lip = smoothstep(2.2 * dp, 0.0, abs(rr - 1.0) * rc);
+    float lipLight = dot(normalize(q + 1e-4), normalize(float2(-1.0, -1.3)));
+    glass += half3(0.45) * half(lip * max(-lipLight, 0.0));
+    glass *= half(1.0 - lip * max(lipLight, 0.0) * 0.45);
+
+    return half4(glass, 1.0) * half(clamp(0.5 - d, 0.0, 1.0));
 }
 """
 
@@ -235,7 +246,7 @@ internal fun GlassToggleVersusScreen() {
             ToggleImpl.NoShader -> CopyToggle(thumb.asState(), pill.asState(), stage)
         }
         Text(
-            if (impl == ToggleImpl.Shader) "RenderEffect: inside the thumb, read and blur what is underneath; bevel, dots, cap"
+            if (impl == ToggleImpl.Shader) "the groove again under the thumb → RenderEffect chain: platform blur, then the glass shader (rim lens, bevel, concave cap)"
             else "the groove drawn again inside the clipped thumb, in a blurred layer; tint, rim, dots, cap on top",
             color = EngineDim,
             fontSize = 11.sp,
@@ -247,17 +258,41 @@ internal fun GlassToggleVersusScreen() {
 private fun ShaderToggle(thumbP: State<Float>, pillP: State<Float>, modifier: Modifier) {
     val labels = rememberToggleLabels()
     val shader = remember { newRuntimeShader(GLASS_SHADER) }
+    var stage by remember { mutableStateOf(Size.Zero) }
+    val margin = 30.dp
     Box(
         modifier
-            .graphicsLayer {
-                val left = thumbLeft(thumbP.value, size.width)
-                val top = (size.height - ThumbH.toPx()) / 2f
-                shader.setFloatUniform("thumb", left, top, left + ThumbW.toPx(), top + ThumbH.toPx())
-                shader.setFloatUniform("dp", 1.dp.toPx())
-                renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
-            }
+            .onSizeChanged { stage = Size(it.width.toFloat(), it.height.toFloat()) }
             .drawBehind { drawGroove(thumbP.value, pillP.value, labels) },
-    )
+    ) {
+        // The groove again under the thumb, in a layer a little wider than the thumb. Its effect is
+        // a chain: the platform blur first, then the glass shader over the blurred result.
+        Box(
+            Modifier
+                .offset {
+                    IntOffset(
+                        (thumbLeft(thumbP.value, stage.width) - margin.toPx()).toInt(),
+                        ((stage.height - ThumbH.toPx()) / 2f - margin.toPx()).toInt(),
+                    )
+                }
+                .requiredSize(ThumbW + margin * 2, ThumbH + margin * 2)
+                .graphicsLayer {
+                    val m = margin.toPx()
+                    shader.setFloatUniform("thumb", m, m, m + ThumbW.toPx(), m + ThumbH.toPx())
+                    shader.setFloatUniform("dp", 1.dp.toPx())
+                    val blur = 11.dp.toPx() * 0.6f
+                    renderEffect = RenderEffect.createChainEffect(
+                        RenderEffect.createRuntimeShaderEffect(shader, "content"),
+                        RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP),
+                    ).asComposeRenderEffect()
+                }
+                .drawBehind {
+                    val left = thumbLeft(thumbP.value, stage.width) - margin.toPx()
+                    val top = (stage.height - ThumbH.toPx()) / 2f - margin.toPx()
+                    translate(-left, -top) { drawGroove(thumbP.value, pillP.value, labels, stage) }
+                },
+        )
+    }
 }
 
 /**
