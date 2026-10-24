@@ -25,6 +25,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.NormalMapVersusS
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.VinylVersusScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
 import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
@@ -253,6 +254,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Normal map · with and without a shader",
                         description = "Scratched steel under a moving light: per-pixel lighting or a color matrix",
                     ) { NormalMapVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-vinyl",
+                        title = "Vinyl · with and without a shader",
+                        description = "Groove sheen that follows a moving lamp: per-pixel or gradients",
+                    ) { VinylVersusScreen() },
                 ),
             ),
         ),
