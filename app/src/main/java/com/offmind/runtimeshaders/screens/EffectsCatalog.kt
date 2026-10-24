@@ -16,9 +16,12 @@ import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
 import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.DistortionVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
 import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
@@ -217,6 +220,21 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Shader cost",
                         description = "Create, first draw and uniform update, timed on this device",
                     ) { ShaderCostScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-metaballs",
+                        title = "Metaballs · with and without a shader",
+                        description = "A distance field versus blur and an alpha threshold",
+                    ) { MetaballsVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-shadows",
+                        title = "Soft shadows · with and without a shader",
+                        description = "A neumorphic star under a moving light: distance field or blurred masks",
+                    ) { ShadowsVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-distortion",
+                        title = "Distortion · with and without a shader",
+                        description = "A ripple over a live list: per-pixel reads or a snapshot every frame",
+                    ) { DistortionVersusScreen() },
                 ),
             ),
         ),

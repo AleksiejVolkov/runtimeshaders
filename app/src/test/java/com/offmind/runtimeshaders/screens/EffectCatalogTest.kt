@@ -21,7 +21,7 @@ class EffectCatalogTest {
             "neon-fog-button", "circular-timer", "metal-knob", "opengl-glass", "tape-plane", "waveshock",
             "canvas-deform", "metaballs", "lamp-shadow", "snowed-dialog", "burn-after-reading",
             "navigation-test", "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area",
-            "engine-shader-cost",
+            "engine-shader-cost", "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion",
         )
         assertEquals(expectedIds, ids.toSet())
         assertEquals(expectedIds.size, ids.size)
@@ -49,7 +49,10 @@ class EffectCatalogTest {
     @Test
     fun `compose engine demos form one group at the root in their order`() {
         assertEquals(
-            listOf("engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost"),
+            listOf(
+                "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost",
+                "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion",
+            ),
             effectsCatalog.category("compose-engine").children.map { it.id },
         )
         assertEquals("compose-engine", effectsCatalog.ancestors("engine-shader-cost").last().id)
