@@ -15,6 +15,10 @@ import com.offmind.runtimeshaders.screens.effects.TapePlaneTestScreen
 import com.offmind.runtimeshaders.screens.effects.TestShaderScreen
 import com.offmind.runtimeshaders.screens.effects.TimerShaderScreen
 import com.offmind.runtimeshaders.screens.effects.WaveshockOnTapScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.DeferredReadsScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
 import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
@@ -186,6 +190,33 @@ internal val effectsCatalog = EffectCatalog(
                     ) { onNavigate ->
                         NavigationTestScreen(onLogin = { onNavigate(Route.NavigationTestFeed) })
                     },
+                ),
+            ),
+            EffectCategory(
+                id = "compose-engine",
+                title = "Compose engine",
+                description = "Phases, deferred reads and what a shader costs, measured live",
+                children = listOf(
+                    EffectScreenData(
+                        id = "engine-glow-buttons",
+                        title = "Two glow buttons",
+                        description = "Agent code next to the fixed version, fix by fix",
+                    ) { GlowButtonsScreen() },
+                    EffectScreenData(
+                        id = "engine-deferred-reads",
+                        title = "Deferred reads",
+                        description = "One animation read in composition, placement or a layer",
+                    ) { DeferredReadsScreen() },
+                    EffectScreenData(
+                        id = "engine-shader-area",
+                        title = "Shader area",
+                        description = "A button versus the whole screen; brush versus RenderEffect",
+                    ) { ShaderAreaScreen() },
+                    EffectScreenData(
+                        id = "engine-shader-cost",
+                        title = "Shader cost",
+                        description = "Create, first draw and uniform update, timed on this device",
+                    ) { ShaderCostScreen() },
                 ),
             ),
         ),

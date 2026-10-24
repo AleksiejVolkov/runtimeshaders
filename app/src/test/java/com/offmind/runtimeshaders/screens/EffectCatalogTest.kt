@@ -20,7 +20,8 @@ class EffectCatalogTest {
             "neumorphism-thermostat", "dual-light-texture", "illuminate-ui", "colorful-toggle",
             "neon-fog-button", "circular-timer", "metal-knob", "opengl-glass", "tape-plane", "waveshock",
             "canvas-deform", "metaballs", "lamp-shadow", "snowed-dialog", "burn-after-reading",
-            "navigation-test",
+            "navigation-test", "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area",
+            "engine-shader-cost",
         )
         assertEquals(expectedIds, ids.toSet())
         assertEquals(expectedIds.size, ids.size)
@@ -43,6 +44,16 @@ class EffectCatalogTest {
             effectsCatalog.category("opengl-scenes").children.map { it.id },
         )
         assertEquals(11, effectsCatalog.category("widgets").effectCount)
+    }
+
+    @Test
+    fun `compose engine demos form one group at the root in film order`() {
+        assertEquals(
+            listOf("engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost"),
+            effectsCatalog.category("compose-engine").children.map { it.id },
+        )
+        assertEquals("compose-engine", effectsCatalog.ancestors("engine-shader-cost").last().id)
+        assertEquals("effects", effectsCatalog.ancestors("compose-engine").single().id)
     }
 
     @Test
