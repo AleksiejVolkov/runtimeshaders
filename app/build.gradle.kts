@@ -1,16 +1,16 @@
 import com.offmind.runtimeshaders.scripts.CREATE_DEPENDENCY_TASK_NAME
 import com.offmind.runtimeshaders.scripts.registerGenerateShaderFunctionsTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.offmind.runtimeshaders"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.offmind.runtimeshaders"
@@ -29,9 +29,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
     }
@@ -41,7 +38,14 @@ android {
         }
     }
     sourceSets {
-        getByName("main").java.srcDirs("build/generated/src/main/java")
+        // built-in Kotlin compiles only the kotlin source set
+        getByName("main").kotlin.srcDir("build/generated/src/main/java")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -52,19 +56,21 @@ tasks.named("preBuild") {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.navigation3:navigation3-runtime:1.0.1")
     implementation(libs.navigation3.ui)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // no longer comes with material3
+    implementation("androidx.compose.material:material-icons-core")
     implementation(libs.datastore.preferences)
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
