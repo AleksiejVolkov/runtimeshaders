@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,12 +29,14 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun GlassRefractionScreen() {
     Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
-        CardList(Modifier.fillMaxSize().glassBackdrop())
+        val panel = remember { GlassPanel() }
+        CardList(Modifier.fillMaxSize().glassBackdrop(panel))
 
         Box(
             Modifier
                 .align(Alignment.Center)
                 .size(width = 320.dp, height = 220.dp)
+                .glassPanel(panel, cornerRadius = 36.dp)
                 .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
         )
     }
