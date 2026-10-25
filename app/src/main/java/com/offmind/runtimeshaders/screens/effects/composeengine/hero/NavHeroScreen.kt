@@ -89,9 +89,12 @@ private const val WORLD_PER_DP = 1.05f   // map scale: world units per dp
 internal enum class HeaderBlurMode(val label: String) { Shader("Blur: AGSL"), Stack("Blur: stack"), None("Blur: none") }
 
 /*
- * The glass of the cards: Snell's law through a thick slab with a rounded bevel, as in the glass
- * refraction demo (glassrefraction/BackdropGlass.kt, `glassShader`, by the same author), applied to
- * the map layer with the cards' rectangles as uniforms.
+ * The glass of the cards: Snell's law through a thick slab with a rounded bevel — `glassShader`
+ * from screens/effects/glassrefraction/BackdropGlass.kt on the article/glass-refraction branch
+ * (commit 7ca815f; the same shader as its step 5, 9584044), unchanged, applied to the map layer
+ * with the cards' rectangles as uniforms. Only the constants differ for these smaller cards (there:
+ * thickness 70 dp, bevel 100 dp, IOR 1.5, white tint 0.06). The map fills the layer the shader
+ * samples, so nothing seen through the glass comes from outside it.
  */
 @Language("AGSL")
 private val CardGlassShader = """
