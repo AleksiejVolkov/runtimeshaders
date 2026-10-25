@@ -58,6 +58,10 @@ private val ListHeight = 460.dp
 private val HeaderHeight = 200.dp
 private val MaxBlur = 24.dp
 
+// Haze's layered approximation steps every 64 dp of the gradient (BlurRenderEffectVisualEffect.kt,
+// drawProgressiveWithMultipleLayers): a 200 dp header is 4 steps, 5 copies.
+private val HazeSteps = kotlin.math.ceil(HeaderHeight.value / 64f).toInt()
+
 /*
  * The variable-radius pass of Compose's BlurRadiusSpec (androidx.compose.ui:ui-graphics
  * 1.13.0-beta02, blur/BlurShaders.kt, progressiveLinearBlurSkSl + blurCoreSkSl; Apache License 2.0,
@@ -137,6 +141,7 @@ private enum class BlurImpl(val label: String) {
     Shader("AGSL (BlurRadiusSpec's shader)"),
     Stack("Without a shader: blur stack"),
     Uniform("One radius (reference)"),
+    None("No blur (zero)"),
 }
 
 @Composable
@@ -157,16 +162,18 @@ internal fun ProgressiveBlurVersusScreen() {
         Box(Modifier.fillMaxWidth().height(ListHeight).clipToBounds()) {
             when (impl) {
                 BlurImpl.Shader -> ShaderProgressiveBlur(t)
-                BlurImpl.Stack -> StackProgressiveBlur(t, steps = 5)
+                BlurImpl.Stack -> StackProgressiveBlur(t, steps = HazeSteps)
                 BlurImpl.Uniform -> StackProgressiveBlur(t, steps = 1)
+                BlurImpl.None -> StackProgressiveBlur(t, steps = 0)
             }
             HeaderTitle()
         }
         Text(
             when (impl) {
                 BlurImpl.Shader -> "one RenderEffect chain over the list: horizontal then vertical blur, radius per pixel"
-                BlurImpl.Stack -> "the list recorded once, drawn again 6 times, each copy with one platform blur radius and a band mask"
+                BlurImpl.Stack -> "the list recorded once, drawn again in bands of 64 dp (as Haze), each copy with one platform blur radius and a band mask"
                 BlurImpl.Uniform -> "the same, with one band and one radius: cheap, but the blur does not grow towards the edge"
+                BlurImpl.None -> "the same screen without any blur: the baseline"
             },
             color = EngineDim,
             fontSize = 11.sp,
@@ -259,7 +266,9 @@ private fun StackProgressiveBlur(t: State<Float>, steps: Int) {
                     drawLayer(listLayer)
                 },
         ) { BlurredList(t) }
-        if (steps == 1) {
+        if (steps == 0) {
+            // no blur: the baseline
+        } else if (steps == 1) {
             BlurBand(listLayer, radiusFraction = 0.5f) {
                 Brush.verticalGradient(0f to Color.Black, 0.85f to Color.Black, 1f to Color.Transparent)
             }
