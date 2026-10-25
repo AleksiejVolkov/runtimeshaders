@@ -1,9 +1,14 @@
 package com.offmind.runtimeshaders.screens.effects.composeengine.bulb
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -22,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -48,8 +54,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.offmind.runtimeshaders.screens.effects.composeengine.EngineChoice
 import com.offmind.runtimeshaders.screens.effects.composeengine.PhaseCounter
 import com.offmind.runtimeshaders.screens.effects.composeengine.RecordPhases
@@ -72,6 +80,14 @@ private val DimmerShader = climateKnobShader
         "vec3 ink = mix(vec3(0.66, 0.66, 0.68), vec3(0.16, 0.16, 0.18), active);",
         "vec3 ink = mix(vec3(0.32, 0.29, 0.30), vec3(1.0, 0.72, 0.40), active);",
     )
+    // the knob catches the bulb's light: warmer and brighter with power, most on the side facing up
+    .replace(
+        "return half4(col, 1.0);",
+        """float fromBulb = knobValue * (0.55 + 0.45 * smoothstep(0.0, 1.0, -p.y));
+    col *= mix(vec3(1.0), vec3(1.40, 1.06, 0.76), fromBulb);
+    col += vec3(1.0, 0.62, 0.30) * knobValue * 0.12 * knobMask * smoothstep(0.2, 1.0, -p.y);
+    return half4(col, 1.0);""",
+    )
 private val LightFromBulb = floatArrayOf(0f, -0.80f, 0.60f)
 
 @Composable
@@ -80,6 +96,7 @@ internal fun BulbHeroScreen() {
     var knobRead by rememberSaveable { mutableStateOf(KnobRead.Draw) }
     var sweep by rememberSaveable { mutableStateOf(false) }
     var lab by rememberSaveable { mutableStateOf(false) }
+    var capture by rememberSaveable { mutableStateOf(false) }
 
     val power = remember { mutableFloatStateOf(0f) }
     val knobCounter = remember { PhaseCounter("dimmer") }
@@ -89,7 +106,8 @@ internal fun BulbHeroScreen() {
     // auto-sweep: power 0 → 1 → 0, for measuring and recording
     val sweepValue = rememberInfiniteTransition(label = "sweep")
         .animateFloat(0f, 1f, infiniteRepeatable(tween(4_000, easing = LinearEasing), RepeatMode.Reverse), label = "p")
-    if (sweep) LaunchedEffect(Unit) { while (true) withFrameNanos { power.floatValue = sweepValue.value } }
+    if (sweep && !capture) LaunchedEffect(Unit) { while (true) withFrameNanos { power.floatValue = sweepValue.value } }
+    val captureTime = rememberCaptureClock(capture, power)
 
     val variant = "halo=${halo.name}/knob=${knobRead.name}/sweep=$sweep"
     RecordPhases("hero-bulb", variant, listOf(knobCounter))
@@ -97,7 +115,7 @@ internal fun BulbHeroScreen() {
     recordAllocations("hero-bulb", variant)
 
     Box(Modifier.fillMaxSize().background(Color(0xFF120E14))) {
-        BulbScene(power, time, halo, Modifier.fillMaxSize())
+        BulbScene(power, if (capture) captureTime else time, halo, Modifier.fillMaxSize())
 
         ClimateKnob(
             power, knobRead, knobCounter,
@@ -109,7 +127,7 @@ internal fun BulbHeroScreen() {
 
         Text(
             "⋯",
-            color = Color(0xFF8A8090),
+            color = if (capture) Color.Transparent else Color(0xFF8A8090),
             fontSize = 22.sp,
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -131,6 +149,7 @@ internal fun BulbHeroScreen() {
                 EngineChoice("Halo", HaloMode.entries, halo, { it.label }) { halo = it }
                 EngineChoice("Knob angle", KnobRead.entries, knobRead, { it.label }) { knobRead = it }
                 EngineChoice("Sweep", listOf(false, true), sweep, { if (it) "Sweep: on" else "Sweep: off" }) { sweep = it }
+                EngineChoice("Capture", listOf(false, true), capture, { if (it) "Capture (adb)" else "Live" }) { capture = it; lab = false }
                 Text("close", color = Color(0xFF8A90A3), fontSize = 12.sp, modifier = Modifier.clickable { lab = false })
             }
         }
@@ -264,4 +283,33 @@ private fun HaloStack(scene: GraphicsLayer, power: State<Float>) {
             )
         }
     }
+}
+
+/**
+ * For frame-exact screen captures: time and power as a pure function of a frame number that a shell
+ * script sends: `am broadcast -a com.offmind.runtimeshaders.ENGINE_FRAME --ei frame N`. One frame =
+ * 1/60 s: a second off, the knob turned up over four seconds, then on. The capture is a smooth 60 fps
+ * clip whatever the device's speed.
+ */
+@Composable
+private fun rememberCaptureClock(enabled: Boolean, power: androidx.compose.runtime.MutableFloatState): State<Float> {
+    val time = remember { mutableFloatStateOf(0f) }
+    val context = LocalContext.current
+    DisposableEffect(enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        fun at(frame: Int) {
+            val seconds = frame / 60f
+            time.floatValue = 3f + seconds
+            power.floatValue = FastOutSlowInEasing.transform(((seconds - 1f) / 4f).coerceIn(0f, 1f))
+        }
+        at(0)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: Intent) = at(intent.getIntExtra("frame", 0))
+        }
+        ContextCompat.registerReceiver(
+            context, receiver, IntentFilter("com.offmind.runtimeshaders.ENGINE_FRAME"), ContextCompat.RECEIVER_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return time
 }
