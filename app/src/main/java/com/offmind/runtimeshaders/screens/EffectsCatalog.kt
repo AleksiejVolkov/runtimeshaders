@@ -29,6 +29,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.ProgressiveBlurV
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.hero.NavHeroScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.VinylVersusScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassSetScreen
@@ -208,6 +209,11 @@ internal val effectsCatalog = EffectCatalog(
                 title = "Compose engine",
                 description = "Phases, deferred reads and what a shader costs, measured live",
                 children = listOf(
+                    EffectScreenData(
+                        id = "engine-hero-nav",
+                        title = "In-car navigation",
+                        description = "A procedural map, a blurring route header, glass turn cards and a steel climate knob",
+                    ) { NavHeroScreen() },
                     EffectScreenData(
                         id = "engine-glow-buttons",
                         title = "Two glow buttons",

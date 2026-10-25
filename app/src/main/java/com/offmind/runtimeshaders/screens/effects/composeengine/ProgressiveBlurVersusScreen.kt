@@ -69,7 +69,7 @@ private val HazeSteps = kotlin.math.ceil(HeaderHeight.value / 64f).toInt()
  * Gaussian whose radius at each pixel is the maximum times an intensity that falls along a line;
  * two programs, one per axis, chained like BlurRadiusSpec does on API 33+.
  */
-private fun blurPassSource(vertical: Boolean): String {
+internal fun blurPassSource(vertical: Boolean): String {
     val offset = if (vertical) "vec2(0.0, i + weightH / weight)" else "vec2(i + weightH / weight, 0.0)"
     val odd = if (vertical) "vec2(0.0, r)" else "vec2(r, 0.0)"
     val inBounds = if (vertical) {
