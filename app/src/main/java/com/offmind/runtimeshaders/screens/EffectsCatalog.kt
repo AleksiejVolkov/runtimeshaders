@@ -25,6 +25,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScree
 import com.offmind.runtimeshaders.screens.effects.composeengine.KnobVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.NormalMapVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.ProgressiveBlurVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
@@ -277,6 +278,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Steel knob · with and without a shader",
                         description = "Brushed steel under a circling lamp: per-pixel highlights or gradients",
                     ) { KnobVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-progblur",
+                        title = "Progressive blur · with and without a shader",
+                        description = "A header that blurs a live list more towards its edge",
+                    ) { ProgressiveBlurVersusScreen() },
                 ),
             ),
         ),
