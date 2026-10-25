@@ -1,7 +1,26 @@
 package com.offmind.runtimeshaders.screens.effects.composeengine
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.compose.animation.core.Easing
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import kotlin.math.floor
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -197,42 +216,146 @@ private enum class ToggleImpl(val label: String) {
 @Composable
 internal fun GlassToggleVersusScreen() {
     var impl by rememberSaveable { mutableStateOf(ToggleImpl.Shader) }
+    var slow by rememberSaveable { mutableStateOf(false) }
+    var clean by rememberSaveable { mutableStateOf(false) }
+    var capture by rememberSaveable { mutableStateOf(false) }
     val thumb = remember { Animatable(0f) }
     val pill = remember { Animatable(0f) }
     val color = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        var on = false
+    LaunchedEffect(slow, capture) {
+        if (capture) return@LaunchedEffect // the frame clock is driven from outside, see CaptureClock
+        // "Slow" stretches every timing ×3 and holds longer at the ends, to see the rim bend
+        val k = if (slow) 3 else 1
+        var on = thumb.targetValue > 0.5f
         while (true) {
-            delay(1_400)
+            delay(if (slow) 2_600L else 1_400L)
             on = !on
             val target = if (on) 1f else 0f
             // two parts, two speeds: the pill in the groove is quicker than the glass above it
-            launch { thumb.animateTo(target, tween(780, easing = FastOutSlowInEasing)) }
-            launch { pill.animateTo(target, tween(420, easing = LinearOutSlowInEasing)) }
-            launch { color.animateTo(target, tween(650, easing = FastOutSlowInEasing)) }
+            launch { thumb.animateTo(target, tween(780 * k, easing = FastOutSlowInEasing)) }
+            launch { pill.animateTo(target, tween(420 * k, easing = LinearOutSlowInEasing)) }
+            launch { color.animateTo(target, tween(650 * k, easing = FastOutSlowInEasing)) }
         }
     }
     val frames by rememberFrameSummary("screen=vs-toggle variant=${impl.name}")
     val alloc = recordAllocations("vs-toggle", impl.name)
 
+    val captured = rememberCaptureClock(enabled = capture, slow = slow)
+    val thumbS = if (capture) captured.thumb else thumb.asState()
+    val pillS = if (capture) captured.pill else pill.asState()
+    val colorS = if (capture) captured.color else color.asState()
+    if (clean) {
+        CleanToggleView(onExit = { clean = false }) {
+            ToggleStage(impl, thumbS, pillS, colorS, Modifier.fillMaxWidth().height(StageH))
+        }
+        return
+    }
     EngineScreen(
         title = "A glass toggle over light",
         subtitle = "The groove's pill and the glass thumb move at their own speeds; the glass frosts what is under it.",
     ) {
         EngineChoice("Implementation", ToggleImpl.entries, impl, { it.label }) { impl = it }
+        EngineChoice("Speed", listOf(false, true), slow, { if (it) "Slow" else "Normal" }) { slow = it }
+        EngineChoice("View", listOf(false, true), clean, { if (it) "Clean view" else "Demo" }) { clean = it }
+        EngineChoice("Clock", listOf(false, true), capture, { if (it) "Capture (adb)" else "Real time" }) { capture = it }
         FrameReadout(frames)
         Text(alloc?.toDisplay() ?: "", style = MonoSmall.copy(color = EngineDim))
-        val stage = Modifier.fillMaxWidth().height(StageH)
-        when (impl) {
-            ToggleImpl.Shader -> ShaderToggle(thumb.asState(), pill.asState(), color.asState(), stage)
-            ToggleImpl.NoShader -> CopyToggle(thumb.asState(), pill.asState(), color.asState(), stage)
-        }
+        ToggleStage(impl, thumbS, pillS, colorS, Modifier.fillMaxWidth().height(StageH))
         Text(
             if (impl == ToggleImpl.Shader) "the groove again under the thumb → RenderEffect chain: platform blur, then the glass shader (rim lens, bevel, concave cap)"
             else "the groove drawn again inside the clipped thumb, in a blurred layer; tint, rim, dots, cap on top",
             color = EngineDim,
             fontSize = 11.sp,
         )
+    }
+}
+
+/**
+ * For frame-exact screen captures: the same toggle timeline as the coroutine above (a switch every
+ * 1.4 s, ×3 slower with [slow]; the same durations and easings), as a pure function of a frame
+ * number that a shell script sends: `am broadcast -a com.offmind.runtimeshaders.ENGINE_FRAME
+ * --ei frame N`. One frame = 1/60 s, so a capture is a smooth 60 fps clip whatever the device's speed.
+ */
+private class CaptureClock {
+    val thumb = mutableFloatStateOf(0f)
+    val pill = mutableFloatStateOf(0f)
+    val color = mutableFloatStateOf(0f)
+
+    fun at(frame: Int, slow: Boolean) {
+        val k = if (slow) 3f else 1f
+        val period = if (slow) 2_600f else 1_400f
+        val ms = frame * 1000f / 60f
+        val switches = floor(ms / period).toInt()          // switches that have started
+        if (switches == 0) {
+            thumb.floatValue = 0f; pill.floatValue = 0f; color.floatValue = 0f
+            return
+        }
+        val target = if (switches % 2 == 1) 1f else 0f
+        val since = ms - switches * period
+        fun ease(duration: Float, easing: Easing) = easing.transform((since / (duration * k)).coerceIn(0f, 1f))
+        val from = 1f - target
+        thumb.floatValue = from + (target - from) * ease(780f, FastOutSlowInEasing)
+        pill.floatValue = from + (target - from) * ease(420f, LinearOutSlowInEasing)
+        color.floatValue = from + (target - from) * ease(650f, FastOutSlowInEasing)
+    }
+}
+
+@Composable
+private fun rememberCaptureClock(enabled: Boolean, slow: Boolean): CaptureClock {
+    val clock = remember { CaptureClock() }
+    val context = LocalContext.current
+    DisposableEffect(enabled, slow) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        clock.at(0, slow)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: Intent) = clock.at(intent.getIntExtra("frame", 0), slow)
+        }
+        ContextCompat.registerReceiver(
+            context, receiver, IntentFilter("com.offmind.runtimeshaders.ENGINE_FRAME"), ContextCompat.RECEIVER_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return clock
+}
+
+@Composable
+private fun ToggleStage(
+    impl: ToggleImpl,
+    thumb: State<Float>,
+    pill: State<Float>,
+    color: State<Float>,
+    modifier: Modifier,
+) {
+    when (impl) {
+        ToggleImpl.Shader -> ShaderToggle(thumb, pill, color, modifier)
+        ToggleImpl.NoShader -> CopyToggle(thumb, pill, color, modifier)
+    }
+}
+
+/**
+ * Only the toggle, 1.6× larger (drawn at a higher density, not scaled up), centred on the dark
+ * background, with the system bars hidden — for recording the screen. A tap leaves it.
+ */
+@Composable
+private fun CleanToggleView(onExit: () -> Unit, content: @Composable () -> Unit) {
+    val window = LocalActivity.current?.window
+    DisposableEffect(window) {
+        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(EngineBackground)
+            .pointerInput(Unit) { detectTapGestures { onExit() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(LocalDensity provides Density(density.density * 1.6f, density.fontScale)) {
+            content()
+        }
     }
 }
 
