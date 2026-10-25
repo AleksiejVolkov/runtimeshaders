@@ -24,6 +24,7 @@ class EffectCatalogTest {
             "engine-shader-cost", "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion",
             "engine-vs-dust", "engine-vs-edgefade", "engine-vs-normalmap",
             "engine-vs-vinyl", "engine-vs-charge", "engine-vs-toggle",
+            "engine-vs-knob",
         )
         assertEquals(expectedIds, ids.toSet())
         assertEquals(expectedIds.size, ids.size)
@@ -55,7 +56,7 @@ class EffectCatalogTest {
                 "engine-glow-buttons", "engine-deferred-reads", "engine-shader-area", "engine-shader-cost",
                 "engine-vs-metaballs", "engine-vs-shadows", "engine-vs-distortion", "engine-vs-dust",
                 "engine-vs-edgefade", "engine-vs-normalmap", "engine-vs-vinyl",
-                "engine-vs-charge", "engine-vs-toggle",
+                "engine-vs-charge", "engine-vs-toggle", "engine-vs-knob",
             ),
             effectsCatalog.category("compose-engine").children.map { it.id },
         )

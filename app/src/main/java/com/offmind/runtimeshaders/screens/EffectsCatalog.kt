@@ -22,6 +22,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.DustVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.EdgeFadeVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlassToggleVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.GlowButtonsScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.KnobVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.MetaballsVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.NormalMapVersusScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
@@ -271,6 +272,11 @@ internal val effectsCatalog = EffectCatalog(
                         title = "Glass toggle · with and without a shader",
                         description = "Frosted glass over moving light: a refracting lens or a blurred copy",
                     ) { GlassToggleVersusScreen() },
+                    EffectScreenData(
+                        id = "engine-vs-knob",
+                        title = "Steel knob · with and without a shader",
+                        description = "Brushed steel under a circling lamp: per-pixel highlights or gradients",
+                    ) { KnobVersusScreen() },
                 ),
             ),
         ),
