@@ -29,6 +29,7 @@ import com.offmind.runtimeshaders.screens.effects.composeengine.ProgressiveBlurV
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderAreaScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShaderCostScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.ShadowsVersusScreen
+import com.offmind.runtimeshaders.screens.effects.composeengine.bulb.BulbHeroScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.hero.NavHeroScreen
 import com.offmind.runtimeshaders.screens.effects.composeengine.VinylVersusScreen
 import com.offmind.runtimeshaders.screens.effects.glass.GlassBasicsScreen
@@ -209,6 +210,11 @@ internal val effectsCatalog = EffectCatalog(
                 title = "Compose engine",
                 description = "Phases, deferred reads and what a shader costs, measured live",
                 children = listOf(
+                    EffectScreenData(
+                        id = "engine-hero-bulb",
+                        title = "Light bulb",
+                        description = "A glass bulb over a pastel background, dimmed by a steel knob: refraction, filament, halo",
+                    ) { BulbHeroScreen() },
                     EffectScreenData(
                         id = "engine-hero-nav",
                         title = "In-car navigation",

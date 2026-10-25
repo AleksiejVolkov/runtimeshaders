@@ -45,10 +45,10 @@ internal enum class KnobRead(val label: String) {
 internal const val KNOB_SWEEP = (1.5 * PI).toFloat()   // 270°
 
 /** The cabin lamp: fixed above and to the left, so the highlight stays put while the knob turns. */
-private val CabinLight = floatArrayOf(-0.42f, -0.58f, 0.70f)
+internal val CabinLight = floatArrayOf(-0.42f, -0.58f, 0.70f)
 
 // The Metal Knob shader with one more uniform: the notch can be left to a separate view.
-private val climateKnobShader = metalKnobShader
+internal val climateKnobShader = metalKnobShader
     .replace("float notch = smoothstep", "float notch = notchVisible * smoothstep")
 
 /**
@@ -64,9 +64,11 @@ internal fun ClimateKnob(
     counter: PhaseCounter,
     modifier: Modifier = Modifier,
     radius: Dp = 64.dp,
+    shaderSource: String = climateKnobShader,
+    lightDir: FloatArray = CabinLight,
 ) {
-    val shader = remember {
-        Shader(climateKnobShader).getRuntimeShader(
+    val shader = remember(shaderSource) {
+        Shader(shaderSource).getRuntimeShader(
             uniforms = basicUniformList
                 .removeUniform("image")
                 .addUniform(Uniform.Type.FLOAT to "knobRadius")
@@ -110,7 +112,7 @@ internal fun ClimateKnob(
                 shader.setFloatUniform("knobRadius", radiusPx)
                 shader.setFloatUniform("knobAngle", (v - 0.5f) * KNOB_SWEEP)
                 shader.setFloatUniform("knobValue", v)
-                shader.setFloatUniform("lightDir", CabinLight[0], CabinLight[1], CabinLight[2])
+                shader.setFloatUniform("lightDir", lightDir[0], lightDir[1], lightDir[2])
                 shader.setFloatUniform("notchVisible", if (readIn == KnobRead.Placement) 0f else 1f)
                 drawRect(brush)
             },
