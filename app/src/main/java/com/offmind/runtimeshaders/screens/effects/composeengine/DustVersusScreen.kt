@@ -115,9 +115,135 @@ half4 main(float2 p) {
 }
 """
 
+/**
+ * The same dissolve, but the motion is a smooth noise field plus a small per-particle jitter, so a
+ * pixel can find its particle without a search: run the motion backwards a few times (fixed-point
+ * iteration p = c + F(c)) to get the source cell, then test only that cell and its 8 neighbours.
+ * It is exact while neighbouring particles move nearly together (the field changes slowly and the
+ * jitter stays within a cell); where the field folds, some particles are missed and read as gaps.
+ */
+@Language("AGSL")
+private const val DUST_FIELD_SHADER = """
+uniform shader content;
+uniform float4 rect;
+uniform float cell;
+uniform float maxDrift;
+uniform float t;
+uniform float2 dir;
+
+float hash(float2 c, float k) {
+    return fract(52.9829189 * fract(c.x * 0.06711056 + c.y * 0.00583715 + k * 0.1234));
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i, 5.0), hash(i + float2(1, 0), 5.0), u.x), mix(hash(i + float2(0, 1), 5.0), hash(i + float2(1, 1), 5.0), u.x), u.y);
+}
+
+// The motion of a particle whose cell centre is cc: a smooth field (noise over the bubble),
+// and the progress u of its flight.
+float3 field(float2 cc) {
+    float2 q = (cc - rect.xy) / (cell * 18.0);
+    float delay = 0.55 * (cc.x - rect.x) / (rect.z - rect.x) + 0.12 * noise(q + 7.1);
+    float u = clamp((t - delay) / 0.45, 0.0, 1.0);
+    float2 perp = float2(-dir.y, dir.x);
+    float2 d = dir * maxDrift * (0.35 + 0.65 * noise(q)) * pow(u, 1.6) + perp * (noise(q + 3.7) * 2.0 - 1.0) * cell * 8.0 * u;
+    return float3(d, u);
+}
+
+half4 main(float2 p) {
+    if (t >= 1.12) return half4(0);
+    if (t <= 0.0) return content.eval(p);
+    if (p.x < rect.x - cell * 9.0 || p.x > rect.z + maxDrift * dir.x + cell * 9.0 ||
+        p.y < rect.y + maxDrift * dir.y - cell * 9.0 || p.y > rect.w + cell * 9.0) return half4(0);
+    // Where did this pixel come from? Run the field backwards: c = p - F(c), three times.
+    float2 c = p;
+    for (int i = 0; i < 3; i++) c = p - field(c).xy;
+    float2 base = floor((c - rect.xy) / cell);
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            float2 idx = base + float2(float(x), float(y));
+            float2 cc = rect.xy + (idx + 0.5) * cell;
+            if (cc.x < rect.x || cc.x > rect.z || cc.y < rect.y || cc.y > rect.w) continue;
+            float3 f = field(cc);
+            // each particle's own small wander, kept inside its cell so the 3 x 3 test still finds it
+            float2 jitter = (float2(hash(idx, 1.0), hash(idx, 2.0)) - 0.5) * cell * 0.9 * f.z;
+            float2 local = p - (cc + f.xy + jitter);
+            if (abs(local.x) <= cell * 0.5 && abs(local.y) <= cell * 0.5) {
+                return content.eval(cc + local) * half(1.0 - f.z);
+            }
+        }
+    }
+    return half4(0);
+}
+"""
+
+/**
+ * The dust look kept, the search dropped: each particle's speed is one of 8 levels (picked by its
+ * cell's hash), and its delay and sideways drift follow the level. For one level the motion
+ * depends only on where the cell is, so it can be run backwards (three fixed-point steps). A pixel
+ * asks 8 times "which cell of this speed would have landed here?" and keeps the one whose hash
+ * really has that speed — 8 direct lookups instead of walking ~60 steps × 3 lanes.
+ */
+@Language("AGSL")
+private const val DUST_LEVELS_SHADER = """
+uniform shader content;
+uniform float4 rect;
+uniform float cell;
+uniform float maxDrift;
+uniform float t;
+uniform float2 dir;
+
+const float LEVELS = 8.0;
+
+float hash(float2 c, float k) {
+    return fract(52.9829189 * fract(c.x * 0.06711056 + c.y * 0.00583715 + k * 0.1234));
+}
+
+half4 main(float2 p) {
+    if (t >= 1.12) return half4(0);
+    if (t <= 0.0) return content.eval(p);
+    if (p.x < rect.x - cell || p.x > rect.z + maxDrift * dir.x + cell ||
+        p.y < rect.y + maxDrift * dir.y - cell || p.y > rect.w + cell) return half4(0);
+    float2 perp = float2(-dir.y, dir.x);
+    float width = rect.z - rect.x;
+    for (int k = 0; k < 8; k++) {
+        float level = (float(k) + 0.5) / LEVELS;
+        float speed = maxDrift * (0.35 + 0.65 * level);
+        float spread = 0.12 * fract(level * 7.31 + 0.13);
+        float side = (fract(level * 3.17 + 0.41) * 2.0 - 1.0) * cell;
+        // run the motion of this speed backwards: c = p - D(c)
+        float2 c = p;
+        for (int i = 0; i < 3; i++) {
+            float u = clamp((t - 0.55 * (c.x - rect.x) / width - spread) / 0.45, 0.0, 1.0);
+            c = p - (dir * speed * pow(u, 1.6) + perp * side * u);
+        }
+        float2 idx = floor((c - rect.xy) / cell);
+        if (floor(hash(idx, 1.0) * LEVELS) != float(k)) continue;     // that cell flies at another speed
+        float2 cc = rect.xy + (idx + 0.5) * cell;
+        if (cc.x < rect.x || cc.x > rect.z || cc.y < rect.y || cc.y > rect.w) continue;
+        float u = clamp((t - 0.55 * (cc.x - rect.x) / width - spread) / 0.45, 0.0, 1.0);
+        float2 local = p - (cc + dir * speed * pow(u, 1.6) + perp * side * u);
+        if (abs(local.x) <= cell * 0.5 && abs(local.y) <= cell * 0.5) {
+            return content.eval(cc + local) * half(1.0 - u);
+        }
+    }
+    return half4(0);
+}
+"""
+
+private enum class DustImpl(val label: String) {
+    Shader("AGSL shader"),
+    Field("AGSL: noise field, no search"),
+    Levels("AGSL: 8 speeds, no search"),
+    NoShader("Without a shader"),
+}
+
 @Composable
 internal fun DustVersusScreen() {
-    var impl by rememberSaveable { mutableStateOf(Impl.Shader) }
+    var impl by rememberSaveable { mutableStateOf(DustImpl.Shader) }
     val t = rememberInfiniteTransition(label = "dust")
         .animateFloat(-0.15f, 1.35f, infiniteRepeatable(tween(3_000, easing = LinearEasing)), label = "t")
     val frames by rememberFrameSummary("screen=vs-dust variant=${impl.name}")
@@ -127,17 +253,23 @@ internal fun DustVersusScreen() {
         title = "Turn a view into dust",
         subtitle = "A message bubble disintegrates, like a deleted message in a chat app.",
     ) {
-        EngineChoice("Implementation", Impl.entries, impl, { it.label }) { impl = it }
+        EngineChoice("Implementation", DustImpl.entries, impl, { it.label }) { impl = it }
         FrameReadout(frames)
         Text(alloc?.toDisplay() ?: "", style = MonoSmall.copy(color = EngineDim))
         val stage = Modifier.fillMaxWidth().height(300.dp)
         when (impl) {
-            Impl.Shader -> ShaderDust(t, stage)
-            Impl.NoShader -> VertexDust(t, stage)
+            DustImpl.Shader -> ShaderDust(t, stage, DUST_SHADER)
+            DustImpl.Field -> ShaderDust(t, stage, DUST_FIELD_SHADER)
+            DustImpl.Levels -> ShaderDust(t, stage, DUST_LEVELS_SHADER)
+            DustImpl.NoShader -> VertexDust(t, stage)
         }
         Text(
-            if (impl == Impl.Shader) "RenderEffect on the live bubble: each pixel finds the particle that landed on it"
-            else "snapshot once → ~20 000 textured quads, positions on the CPU every frame → one drawVertices",
+            when (impl) {
+                DustImpl.Shader -> "RenderEffect on the live bubble: each pixel searches back along the flight for the particle that landed on it"
+                DustImpl.Field -> "RenderEffect, motion = smooth noise field + small jitter: run it backwards, test 3 × 3 cells — no search"
+                DustImpl.Levels -> "RenderEffect, each particle one of 8 speeds: run each speed backwards, 8 direct lookups — no search"
+                DustImpl.NoShader -> "snapshot once → ~20 000 textured quads, positions on the CPU every frame → one drawVertices"
+            },
             color = EngineDim,
             fontSize = 11.sp,
         )
@@ -167,8 +299,8 @@ private class BubbleBounds {
 }
 
 @Composable
-private fun ShaderDust(t: State<Float>, modifier: Modifier) {
-    val shader = remember { newRuntimeShader(DUST_SHADER) }
+private fun ShaderDust(t: State<Float>, modifier: Modifier, source: String) {
+    val shader = remember(source) { newRuntimeShader(source) }
     val bounds = remember { BubbleBounds() }
     Box(
         modifier.graphicsLayer {
