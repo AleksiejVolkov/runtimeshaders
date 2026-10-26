@@ -268,7 +268,7 @@ internal fun DustVersusScreen() {
                 DustImpl.Shader -> "RenderEffect on the live bubble: each pixel searches back along the flight for the particle that landed on it"
                 DustImpl.Field -> "RenderEffect, motion = smooth noise field + small jitter: run it backwards, test 3 × 3 cells — no search"
                 DustImpl.Levels -> "RenderEffect, each particle one of 8 speeds: run each speed backwards, 8 direct lookups — no search"
-                DustImpl.NoShader -> "snapshot once → ~20 000 textured quads, positions on the CPU every frame → one drawVertices"
+                DustImpl.NoShader -> "snapshot once → ~34 000 textured quads, positions on the CPU every frame → one drawVertices"
             },
             color = EngineDim,
             fontSize = 11.sp,
