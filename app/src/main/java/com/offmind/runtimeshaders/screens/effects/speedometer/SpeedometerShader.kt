@@ -2,8 +2,9 @@ package com.offmind.runtimeshaders.screens.effects.speedometer
 
 import org.intellij.lang.annotations.Language
 
-// The speed fill: a band along the rim, from the 0 mark to the speed. Hot at the rim and
-// coloured further in.
+// The speed fill: a band along the rim, from the 0 mark to the (lagging) speed. Hot at the
+// rim, coloured further in, and smoke towards the inner edge, which is torn. The smoke is fbm
+// in polar coordinates, (angle, radius), so it runs along the arc.
 @Language("AGSL")
 internal val speedFillShader = """
     uniform float2 center;
@@ -15,8 +16,37 @@ internal val speedFillShader = """
     uniform float hue;         // 0..1
     uniform float exposure;    // grows with speed: dim at low speed, overexposed near the top
     uniform float model;       // 0: paint, 1: light
+    uniform float time;        // s
 
     const float TAU = 6.2831853;
+
+    float hash(float2 p) {
+        p = fract(p * float2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+    }
+
+    float noise(float2 p) {
+        float2 i = floor(p);
+        float2 f = fract(p);
+        float2 u = f * f * (3.0 - 2.0 * f);
+        return mix(
+            mix(hash(i), hash(i + float2(1.0, 0.0)), u.x),
+            mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+            u.y
+        );
+    }
+
+    float fbm(float2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        for (int i = 0; i < 4; i++) {
+            value += amplitude * noise(p);
+            p = p * 2.03 + float2(17.1, 3.7);
+            amplitude *= 0.5;
+        }
+        return value;
+    }
 
     float3 hsv(float h, float s, float v) {
         float3 k = abs(fract(h + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0;
@@ -58,8 +88,13 @@ internal val speedFillShader = """
         float front = smoothstep(lead + 0.06, lead - 0.06, along);
         if (front <= 0.0) return half4(0.0);
 
-        // the band between the inner edge and the rim
-        float band = smoothstep(inner - 0.01, inner + 0.08, r);
+        // smoke in polar coordinates, flowing forward along the arc
+        float coarse = fbm(float2(along * 5.0 - time * 1.3, r * 7.0));
+        float fine = fbm(float2(along * 13.0 - time * 2.2, r * 16.0) + 5.3);
+
+        // the inner edge is torn by the smoke, the outer one is clean
+        float edge = inner + (coarse - 0.5) * 0.16 + (fine - 0.5) * 0.06;
+        float band = smoothstep(edge - 0.01, edge + 0.08, r);
         float rim = smoothstep(1.005, 0.985, r);
         float strength = band * rim * front;
 
@@ -71,14 +106,18 @@ internal val speedFillShader = """
             float core = exp(-depth * 22.0);
             float glow = exp(-depth * 4.5);
             float3 colour = hsv(hue, 0.9, 1.0);
-            rgb = mix(colour * glow, float3(1.0), core * 0.85) * strength * exposure;
+            float smoke = mix(0.3, 1.35, coarse) * mix(0.6, 1.4, fine) + pow(fine, 6.0) * 2.5;
+            rgb = mix(colour * glow * smoke, float3(1.0), core * 0.85) * strength * exposure;
         } else {
             // light: a colour times an intensity that is far above 1 only in a thin band at
-            // the rim. The tonemap lets the strong channel saturate and pulls the others up:
-            // white only at the rim, and only at speed.
+            // the rim; the smoke leaves dark gaps in the body. The tonemap lets the strong
+            // channel saturate and pulls the others up: white only at the rim, and only at
+            // speed.
             float3 colour = oklchToLinear(0.47, 0.19, hue);
-            float rimHeat = exp(-depth * 28.0);
-            float body = exp(-depth * 3.5);
+            float density = smoothstep(0.28, 0.72, coarse) * mix(0.55, 1.3, fine);
+            density += pow(fine, 6.0) * 1.5;
+            float rimHeat = exp(-depth * 28.0) * mix(0.75, 1.0, fine);
+            float body = exp(-depth * 3.5) * density;
             // the rim heats up faster than the body: white appears only at speed
             float intensity = (30.0 * exposure * rimHeat + 1.8 * body) * strength * exposure;
             // inset (as in AgX): every channel gets a little of the others, the way the eye's

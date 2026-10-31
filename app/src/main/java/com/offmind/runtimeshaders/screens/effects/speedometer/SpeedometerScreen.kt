@@ -59,6 +59,7 @@ private const val HoldAtTop = 1.2f // s, before the launch repeats
 @Composable
 fun SpeedometerScreen() {
     var time by remember { mutableFloatStateOf(0f) } // scenario time
+    var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     var playing by remember { mutableStateOf(true) }
     var light by remember { mutableStateOf(true) } // light or paint
 
@@ -68,6 +69,7 @@ fun SpeedometerScreen() {
             withFrameNanos { now ->
                 if (last != 0L) {
                     val dt = (now - last) / 1e9f
+                    clock += dt
                     if (playing) {
                         time += dt
                         if (time > ScenarioLength + HoldAtTop) time = 0f
@@ -89,6 +91,7 @@ fun SpeedometerScreen() {
             hue = hue,
             light = light,
             exposure = exposureAt(fillSpeed),
+            clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         Column(
@@ -122,6 +125,7 @@ private fun Speedometer(
     hue: Float,
     light: Boolean,
     exposure: Float,
+    clock: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
@@ -141,6 +145,7 @@ private fun Speedometer(
         shader.setFloatUniform("hue", hue / 360f)
         shader.setFloatUniform("model", if (light) 1f else 0f)
         shader.setFloatUniform("exposure", exposure)
+        shader.setFloatUniform("time", clock)
         // additive: light adds up
         drawRect(brush, blendMode = BlendMode.Plus)
     }
