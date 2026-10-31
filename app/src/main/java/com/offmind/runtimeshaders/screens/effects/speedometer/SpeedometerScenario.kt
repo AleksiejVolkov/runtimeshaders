@@ -99,3 +99,10 @@ fun exposureAt(speed: Float): Float {
     val s = (speed / 221f).coerceIn(0f, 1f)
     return 0.2f + 0.8f * s * s
 }
+
+// How far the dial has come apart past the redline: 0 at 200 km/h, 1 at 240, smoothstep so
+// there is no kink where it starts.
+fun breakdownAt(speed: Float): Float {
+    val x = ((speed - 200f) / 40f).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}

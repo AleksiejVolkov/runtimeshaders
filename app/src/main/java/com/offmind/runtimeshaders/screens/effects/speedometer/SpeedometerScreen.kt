@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,6 +67,8 @@ fun SpeedometerScreen() {
     var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     var playing by remember { mutableStateOf(true) }
     var light by remember { mutableStateOf(true) } // light or paint
+    var breakdown by remember { mutableStateOf(true) }
+    var rowBands by remember { mutableStateOf(false) } // horizontal rows instead of arcs
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -95,6 +99,8 @@ fun SpeedometerScreen() {
             light = light,
             exposure = exposureAt(fillSpeed),
             clock = clock,
+            breakdown = if (breakdown) breakdownAt(speed) else 0f,
+            rowBands = rowBands,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         Column(
@@ -116,6 +122,8 @@ fun SpeedometerScreen() {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip(if (light) "light" else "paint") { light = !light }
+                Chip(if (breakdown) "breakdown on" else "off") { breakdown = !breakdown }
+                Chip(if (rowBands) "rows" else "arcs") { rowBands = !rowBands }
             }
         }
     }
@@ -129,10 +137,13 @@ private fun Speedometer(
     light: Boolean,
     exposure: Float,
     clock: Float,
+    breakdown: Float,
+    rowBands: Boolean,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
+    val apart = remember { RuntimeShader(breakdownShader) }
     val text = rememberTextMeasurer()
     val tint = tint(hue, light)
     val redlineTint = tint(hue + RedlineHueOffset, light)
@@ -152,7 +163,22 @@ private fun Speedometer(
         drawRect(brush, alpha = alpha, blendMode = blendMode)
     }
 
-    Box(modifier) {
+    Box(
+        modifier.graphicsLayer {
+            // past the redline everything on the dial comes apart, scale and needle included;
+            // below it the layer has no effect at all
+            renderEffect = if (breakdown > 0f) {
+                apart.setFloatUniform("center", size.width / 2f, size.height / 2f)
+                apart.setFloatUniform("radius", min(size.width, size.height) * 0.42f)
+                apart.setFloatUniform("k", breakdown)
+                apart.setFloatUniform("time", clock)
+                apart.setFloatUniform("rows", if (rowBands) 1f else 0f)
+                RenderEffect.createRuntimeShaderEffect(apart, "image").asComposeRenderEffect()
+            } else {
+                null
+            }
+        }
+    ) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(tint, text) }
         // bloom: the same fill, blurred in its own layer
