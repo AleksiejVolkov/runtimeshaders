@@ -68,3 +68,10 @@ const val RedlineHueOffset = 150f
 fun cycleHueAt(t: Float): Float = wrapHue(360f - RedlineHueOffset - HueSpeed * t)
 
 fun wrapHue(h: Float): Float = ((h % 360f) + 360f) % 360f
+
+// How bright the fill is: a dim, see-through glow at low speed, overexposed only near the top.
+// A square of the speed: slow to start, so 63 km/h stays dim.
+fun exposureAt(speed: Float): Float {
+    val s = (speed / 221f).coerceIn(0f, 1f)
+    return 0.2f + 0.8f * s * s
+}

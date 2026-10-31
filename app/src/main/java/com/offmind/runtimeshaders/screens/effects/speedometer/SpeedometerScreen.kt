@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -58,6 +60,7 @@ private const val HoldAtTop = 1.2f // s, before the launch repeats
 fun SpeedometerScreen() {
     var time by remember { mutableFloatStateOf(0f) } // scenario time
     var playing by remember { mutableStateOf(true) }
+    var light by remember { mutableStateOf(true) } // light or paint
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -84,21 +87,29 @@ fun SpeedometerScreen() {
             speed = speed,
             fill = fillSpeed / MaxSpeed,
             hue = hue,
+            light = light,
+            exposure = exposureAt(fillSpeed),
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
-        Row(
+        Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Chip(if (playing) "pause" else "play") { playing = !playing }
-            listOf(63, 112, 170, 215, 221).forEach { target ->
-                Chip("$target") {
-                    playing = false
-                    time = timeOfSpeed(target.toFloat())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip(if (playing) "pause" else "play") { playing = !playing }
+                listOf(63, 112, 170, 215, 221).forEach { target ->
+                    Chip("$target") {
+                        playing = false
+                        time = timeOfSpeed(target.toFloat())
+                    }
                 }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip(if (light) "light" else "paint") { light = !light }
             }
         }
     }
@@ -109,13 +120,15 @@ private fun Speedometer(
     speed: Float,
     fill: Float,
     hue: Float,
+    light: Boolean,
+    exposure: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
-    val tint = Color.hsv(hue, 0.9f, 1f)
-    val redlineTint = Color.hsv(wrapHue(hue + RedlineHueOffset), 0.9f, 1f)
+    val tint = tint(hue, light)
+    val redlineTint = tint(hue + RedlineHueOffset, light)
 
     // feeds the fill shader
     fun DrawScope.drawFill() {
@@ -126,7 +139,10 @@ private fun Speedometer(
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
         shader.setFloatUniform("hue", hue / 360f)
-        drawRect(brush)
+        shader.setFloatUniform("model", if (light) 1f else 0f)
+        shader.setFloatUniform("exposure", exposure)
+        // additive: light adds up
+        drawRect(brush, blendMode = BlendMode.Plus)
     }
 
     Box(modifier) {
@@ -161,6 +177,9 @@ private fun DrawScope.label(text: TextMeasurer, value: String, at: Offset, style
 }
 
 private fun DrawScope.textSize(r: Float, k: Float) = (r * k / density / fontScale).sp
+
+// The colour of the redline and the charge segment, in the same model as the fill.
+private fun tint(hue: Float, light: Boolean): Color = Color.hsv(wrapHue(hue), 0.9f, 1f)
 
 private fun DrawScope.drawDial(speed: Float, fill: Float, redline: Color, text: TextMeasurer) {
     val r = dialRadius()
