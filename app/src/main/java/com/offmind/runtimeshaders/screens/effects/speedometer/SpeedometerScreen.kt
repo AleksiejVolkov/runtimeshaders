@@ -80,7 +80,7 @@ fun SpeedometerScreen() {
 
     val speed = speedAt(time)
     val fillSpeed = speed
-    val hue = cycleHueAt(time)
+    val hue = cycleHueAt(time, oklch = light)
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Speedometer(
@@ -179,7 +179,24 @@ private fun DrawScope.label(text: TextMeasurer, value: String, at: Offset, style
 private fun DrawScope.textSize(r: Float, k: Float) = (r * k / density / fontScale).sp
 
 // The colour of the redline and the charge segment, in the same model as the fill.
-private fun tint(hue: Float, light: Boolean): Color = Color.hsv(wrapHue(hue), 0.9f, 1f)
+private fun tint(hue: Float, light: Boolean): Color =
+    if (light) oklch(0.66f, 0.17f, hue) else Color.hsv(wrapHue(hue), 0.9f, 1f)
+
+private fun oklch(l: Float, c: Float, hueDeg: Float): Color {
+    val h = Math.toRadians(wrapHue(hueDeg).toDouble())
+    val a = c * cos(h).toFloat()
+    val b = c * sin(h).toFloat()
+    fun cube(x: Float) = x * x * x
+    val l1 = cube(l + 0.3963377774f * a + 0.2158037573f * b)
+    val m1 = cube(l - 0.1055613458f * a - 0.0638541728f * b)
+    val s1 = cube(l - 0.0894841775f * a - 1.2914855480f * b)
+    fun encode(x: Float) = Math.pow(x.coerceIn(0f, 1f).toDouble(), 1 / 2.2).toFloat()
+    return Color(
+        encode(4.0767416621f * l1 - 3.3077115913f * m1 + 0.2309699292f * s1),
+        encode(-1.2684380046f * l1 + 2.6097574011f * m1 - 0.3413193965f * s1),
+        encode(-0.0041960863f * l1 - 0.7034186147f * m1 + 1.7076147010f * s1),
+    )
+}
 
 private fun DrawScope.drawDial(speed: Float, fill: Float, redline: Color, text: TextMeasurer) {
     val r = dialRadius()

@@ -23,6 +23,22 @@ internal val speedFillShader = """
         return v * mix(float3(1.0), clamp(k, 0.0, 1.0), s);
     }
 
+    // OKLCH -> OKLab -> linear sRGB: two matrices and a cube in between
+    float3 oklchToLinear(float l, float c, float h) {
+        float a = c * cos(h * TAU);
+        float b = c * sin(h * TAU);
+        float lms1 = l + 0.3963377774 * a + 0.2158037573 * b;
+        float lms2 = l - 0.1055613458 * a - 0.0638541728 * b;
+        float lms3 = l - 0.0894841775 * a - 1.2914855480 * b;
+        float3 lms = float3(lms1 * lms1 * lms1, lms2 * lms2 * lms2, lms3 * lms3 * lms3);
+        float3 rgb = float3(
+            4.0767416621 * lms.x - 3.3077115913 * lms.y + 0.2309699292 * lms.z,
+            -1.2684380046 * lms.x + 2.6097574011 * lms.y - 0.3413193965 * lms.z,
+            -0.0041960863 * lms.x - 0.7034186147 * lms.y + 1.7076147010 * lms.z
+        );
+        return max(rgb, float3(0.0)); // outside sRGB: just clip
+    }
+
     // filmic curve (ACES fit by Narkowicz): a toe that keeps the dark parts deep and a soft
     // shoulder, per channel
     float3 tonemap(float3 x) {
@@ -60,7 +76,7 @@ internal val speedFillShader = """
             // light: a colour times an intensity that is far above 1 only in a thin band at
             // the rim. The tonemap lets the strong channel saturate and pulls the others up:
             // white only at the rim, and only at speed.
-            float3 colour = hsv(hue, 0.9, 1.0);
+            float3 colour = oklchToLinear(0.47, 0.19, hue);
             float rimHeat = exp(-depth * 28.0);
             float body = exp(-depth * 3.5);
             // the rim heats up faster than the body: white appears only at speed
