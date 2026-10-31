@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -72,6 +71,7 @@ fun SpeedometerScreen() {
     var hueMode by remember { mutableStateOf(HueMode.Cycle) }
     var light by remember { mutableStateOf(true) } // light (OKLCH, tonemap) or paint (HSV, mix)
     var aberration by remember { mutableStateOf(true) }
+    var rowBands by remember { mutableStateOf(false) } // compare: horizontal rows instead of arcs
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -105,6 +105,7 @@ fun SpeedometerScreen() {
             light = light,
             exposure = exposureAt(fillSpeed),
             aberration = if (aberration) aberrationAt(speed) else 0f,
+            rowBands = rowBands,
             clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
@@ -118,7 +119,7 @@ fun SpeedometerScreen() {
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip(if (playing) "pause" else "play") { playing = !playing }
-                listOf(63, 112, 170, 220).forEach { target ->
+                listOf(63, 112, 170, 215, 221).forEach { target ->
                     Chip("$target") {
                         playing = false
                         time = timeOfSpeed(target.toFloat())
@@ -128,7 +129,8 @@ fun SpeedometerScreen() {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip(hueMode.label) { hueMode = HueMode.entries[(hueMode.ordinal + 1) % 2] }
                 Chip(if (light) "light" else "paint") { light = !light }
-                Chip(if (aberration) "CA on" else "CA off") { aberration = !aberration }
+                Chip(if (aberration) "glitch on" else "glitch off") { aberration = !aberration }
+                Chip(if (rowBands) "rows" else "arcs") { rowBands = !rowBands }
             }
         }
     }
@@ -142,11 +144,12 @@ private fun Speedometer(
     light: Boolean,
     exposure: Float,
     aberration: Float,
+    rowBands: Boolean,
     clock: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
-    val split = remember { RuntimeShader(aberrationShader) }
+    val glitch = remember { RuntimeShader(glitchShader) }
     val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
 
@@ -168,13 +171,15 @@ private fun Speedometer(
 
     Box(
         modifier.graphicsLayer {
-            // past the redline everything on the dial splits, scale and needle included;
+            // past the redline everything on the dial comes apart, scale and needle included;
             // below it the layer has no effect at all
             renderEffect = if (aberration > 0f) {
-                val pulse = 1f + 0.15f * sin(clock * 2f * PI.toFloat() * 1.5f)
-                split.setFloatUniform("center", size.width / 2f, size.height / 2f)
-                split.setFloatUniform("amount", 0.02f * aberration * pulse)
-                RenderEffect.createRuntimeShaderEffect(split, "image").asComposeRenderEffect()
+                glitch.setFloatUniform("center", size.width / 2f, size.height / 2f)
+                glitch.setFloatUniform("radius", min(size.width, size.height) * 0.42f)
+                glitch.setFloatUniform("k", aberration)
+                glitch.setFloatUniform("time", clock)
+                glitch.setFloatUniform("rows", if (rowBands) 1f else 0f)
+                RenderEffect.createRuntimeShaderEffect(glitch, "image").asComposeRenderEffect()
             } else {
                 null
             }
