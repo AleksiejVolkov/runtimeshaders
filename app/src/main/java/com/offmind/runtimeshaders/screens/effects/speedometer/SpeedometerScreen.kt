@@ -53,7 +53,6 @@ private const val SweepDeg = 240f
 private const val InnerBand = 0.75f
 private const val RedlineFrom = 200f
 private const val HoldAtTop = 1.2f // s, before the launch repeats
-private val Red = Color(0xFFFF3B30)
 
 @Composable
 fun SpeedometerScreen() {
@@ -78,11 +77,13 @@ fun SpeedometerScreen() {
 
     val speed = speedAt(time)
     val fillSpeed = speed
+    val hue = cycleHueAt(time)
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Speedometer(
             speed = speed,
             fill = fillSpeed / MaxSpeed,
+            hue = hue,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         Row(
@@ -107,13 +108,14 @@ fun SpeedometerScreen() {
 private fun Speedometer(
     speed: Float,
     fill: Float,
+    hue: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
-    val tint = Red
-    val redlineTint = Red
+    val tint = Color.hsv(hue, 0.9f, 1f)
+    val redlineTint = Color.hsv(wrapHue(hue + RedlineHueOffset), 0.9f, 1f)
 
     // feeds the fill shader
     fun DrawScope.drawFill() {
@@ -123,6 +125,7 @@ private fun Speedometer(
         shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
+        shader.setFloatUniform("hue", hue / 360f)
         drawRect(brush)
     }
 

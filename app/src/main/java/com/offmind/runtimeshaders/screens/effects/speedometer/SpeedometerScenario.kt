@@ -59,3 +59,12 @@ fun timeOfSpeed(speed: Float): Float {
     }
     return hi
 }
+
+// Hue in degrees. It keeps turning at 350°/s towards smaller values (blue, cyan, green...),
+// starting where the redline (fill + 150°) is red.
+const val HueSpeed = 350f
+const val RedlineHueOffset = 150f
+
+fun cycleHueAt(t: Float): Float = wrapHue(360f - RedlineHueOffset - HueSpeed * t)
+
+fun wrapHue(h: Float): Float = ((h % 360f) + 360f) % 360f
