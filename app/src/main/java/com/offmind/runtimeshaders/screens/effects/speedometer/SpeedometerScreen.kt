@@ -32,6 +32,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
@@ -178,6 +180,8 @@ private fun Speedometer(
             }
         }
     ) {
+        // the hub sits under everything
+        Canvas(Modifier.matchParentSize()) { drawHub(tint(hue, light), text) }
         // bloom: the same fill, blurred in its own layer
         Canvas(
             Modifier
@@ -280,6 +284,53 @@ private fun DrawScope.drawDial(speed: Float, fill: Float, redlineTint: Color, te
     drawText(number, topLeft = center - Offset(number.size.width / 2f, number.size.height * 0.62f))
     val unit = text.measure("km/h", TextStyle(color = Color.White.copy(alpha = 0.8f), fontSize = (r * 0.065f / density / fontScale).sp))
     drawText(unit, topLeft = center + Offset(-unit.size.width / 2f, r * 0.1f))
+}
+
+// A recessed hub of dark concentric rings around the centre circle, with a short coloured
+// segment along its lower arc (charge / range), a bolt and "210 km".
+private fun DrawScope.drawHub(fillTint: Color, text: TextMeasurer) {
+    val r = dialRadius()
+    drawCircle(
+        Brush.radialGradient(
+            0f to Color(0xFF050506),
+            0.55f to Color(0xFF0B0B0D),
+            0.85f to Color(0xFF17181C),
+            1f to Color(0xFF0A0A0B),
+            center = center,
+            radius = r * 0.56f,
+        ),
+        radius = r * 0.56f,
+    )
+    listOf(0.36f, 0.42f, 0.48f, 0.54f).forEachIndexed { i, k ->
+        drawCircle(Color(0xFF2A2B31).copy(alpha = 0.9f - i * 0.15f), radius = r * k, style = Stroke(1.dp.toPx()))
+    }
+    // a faint light from above on the outer ring
+    drawArc(
+        Color.White.copy(alpha = 0.08f), 200f, 140f, false,
+        Offset(center.x - r * 0.54f, center.y - r * 0.54f), Size(r * 1.08f, r * 1.08f),
+        style = Stroke(3.dp.toPx()),
+    )
+    val ringR = r * 0.48f
+    drawArc(
+        fillTint, 65f, 50f, false,
+        Offset(center.x - ringR, center.y - ringR), Size(2 * ringR, 2 * ringR),
+        style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
+    )
+    // bolt
+    val s = r * 0.035f
+    val bolt = Path().apply {
+        val o = center + Offset(0f, r * 0.37f)
+        moveTo(o.x + 0.2f * s, o.y - s)
+        lineTo(o.x - 0.6f * s, o.y + 0.1f * s)
+        lineTo(o.x, o.y + 0.1f * s)
+        lineTo(o.x - 0.2f * s, o.y + s)
+        lineTo(o.x + 0.6f * s, o.y - 0.1f * s)
+        lineTo(o.x, o.y - 0.1f * s)
+        close()
+    }
+    drawPath(bolt, Color.White.copy(alpha = 0.8f))
+    val range = text.measure("210 km", TextStyle(color = Color.White.copy(alpha = 0.6f), fontSize = (r * 0.05f / density / fontScale).sp))
+    drawText(range, topLeft = center + Offset(-range.size.width / 2f, r * 0.6f))
 }
 
 @Composable

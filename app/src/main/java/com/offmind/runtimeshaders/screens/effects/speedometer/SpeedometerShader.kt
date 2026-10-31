@@ -69,6 +69,12 @@ internal val speedFillShader = """
         return max(rgb, float3(0.0)); // outside sRGB: just clip
     }
 
+    // filmic curve (ACES fit by Narkowicz): a toe that keeps the dark parts deep and a soft
+    // shoulder, per channel
+    float3 tonemap(float3 x) {
+        return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+    }
+
     half4 main(float2 xy) {
         float2 d = xy - center;
         float r = length(d) / radius;
@@ -105,12 +111,16 @@ internal val speedFillShader = """
             float3 colour = hsv(hue, 0.9, 1.0);
             rgb = mix(colour * glow * smoke, float3(1.0), core * 0.85) * strength * exposure;
         } else {
-            // light: a colour of constant lightness, times an intensity far above 1 at the rim;
-            // the tonemap lets the strong channel saturate and pulls the others up to white
-            float3 colour = oklchToLinear(0.55, 0.2, hue);
-            float hot = exp(-depth * 12.0);
-            float intensity = smoke * (14.0 * hot + 1.2 * glow) * strength * exposure;
-            float3 linear = 1.0 - exp(-colour * intensity);
+            // light: a deep colour of constant lightness, times an intensity that is far above 1
+            // only in a thin band at the rim; the smoke leaves dark gaps in the body. The tonemap
+            // lets the strong channel saturate and pulls the others up: white only at the rim.
+            float3 colour = oklchToLinear(0.47, 0.19, hue);
+            float density = smoothstep(0.28, 0.72, coarse) * mix(0.55, 1.3, fine) + pow(fine, 6.0) * 1.5;
+            float rimHeat = exp(-depth * 28.0) * mix(0.75, 1.0, fine);
+            float body = exp(-depth * 3.5) * density;
+            // the rim heats up faster than the body: white appears only at speed
+            float intensity = (30.0 * exposure * rimHeat + 1.8 * body) * strength * exposure;
+            float3 linear = tonemap(colour * intensity);
             rgb = pow(linear, float3(1.0 / 2.2)); // the shader writes sRGB-encoded values
         }
         // additive: the alpha only says how much light there is
