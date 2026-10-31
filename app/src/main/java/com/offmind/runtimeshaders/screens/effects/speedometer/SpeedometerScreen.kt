@@ -1,11 +1,13 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,9 +31,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -67,6 +69,7 @@ fun SpeedometerScreen() {
     var playing by remember { mutableStateOf(true) }
     var hueMode by remember { mutableStateOf(HueMode.Cycle) }
     var light by remember { mutableStateOf(true) } // light (OKLCH, tonemap) or paint (HSV, mix)
+    var aberration by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -98,25 +101,33 @@ fun SpeedometerScreen() {
             fill = fillSpeed / MaxSpeed,
             hue = hue,
             light = light,
+            exposure = exposureAt(fillSpeed),
+            aberration = if (aberration) aberrationAt(speed) else 0f,
             clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
-        Row(
+        Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Chip(if (playing) "pause" else "play") { playing = !playing }
-            listOf(63, 112, 170).forEach { target ->
-                Chip("$target") {
-                    playing = false
-                    time = timeOfSpeed(target.toFloat())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip(if (playing) "pause" else "play") { playing = !playing }
+                listOf(63, 112, 170, 220).forEach { target ->
+                    Chip("$target") {
+                        playing = false
+                        time = timeOfSpeed(target.toFloat())
+                    }
                 }
             }
-            Chip(hueMode.label) { hueMode = HueMode.entries[(hueMode.ordinal + 1) % 2] }
-            Chip(if (light) "light" else "paint") { light = !light }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip(hueMode.label) { hueMode = HueMode.entries[(hueMode.ordinal + 1) % 2] }
+                Chip(if (light) "light" else "paint") { light = !light }
+                Chip(if (aberration) "CA on" else "CA off") { aberration = !aberration }
+            }
         }
     }
 }
@@ -127,10 +138,13 @@ private fun Speedometer(
     fill: Float,
     hue: Float,
     light: Boolean,
+    exposure: Float,
+    aberration: Float,
     clock: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
+    val split = remember { RuntimeShader(aberrationShader) }
     val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
 
@@ -146,12 +160,24 @@ private fun Speedometer(
         shader.setFloatUniform("hue", hue / 360f)
         shader.setFloatUniform("time", clock)
         shader.setFloatUniform("model", if (light) 1f else 0f)
+        shader.setFloatUniform("exposure", exposure)
         drawRect(brush, alpha = alpha, blendMode = blendMode)
     }
 
-    Box(modifier) {
-        // the hub sits under everything
-        Canvas(Modifier.matchParentSize()) { drawHub(tint(hue, light), text) }
+    Box(
+        modifier.graphicsLayer {
+            // past the redline everything on the dial splits, scale and needle included;
+            // below it the layer has no effect at all
+            renderEffect = if (aberration > 0f) {
+                val pulse = 1f + 0.15f * sin(clock * 2f * PI.toFloat() * 1.5f)
+                split.setFloatUniform("center", size.width / 2f, size.height / 2f)
+                split.setFloatUniform("amount", 0.02f * aberration * pulse)
+                RenderEffect.createRuntimeShaderEffect(split, "image").asComposeRenderEffect()
+            } else {
+                null
+            }
+        }
+    ) {
         // bloom: the same fill, blurred in its own layer
         Canvas(
             Modifier
@@ -254,53 +280,6 @@ private fun DrawScope.drawDial(speed: Float, fill: Float, redlineTint: Color, te
     drawText(number, topLeft = center - Offset(number.size.width / 2f, number.size.height * 0.62f))
     val unit = text.measure("km/h", TextStyle(color = Color.White.copy(alpha = 0.8f), fontSize = (r * 0.065f / density / fontScale).sp))
     drawText(unit, topLeft = center + Offset(-unit.size.width / 2f, r * 0.1f))
-}
-
-// A recessed hub of dark concentric rings around the centre circle, with a short coloured
-// segment along its lower arc (charge / range), a bolt and "210 km".
-private fun DrawScope.drawHub(fillTint: Color, text: TextMeasurer) {
-    val r = dialRadius()
-    drawCircle(
-        Brush.radialGradient(
-            0f to Color(0xFF050506),
-            0.55f to Color(0xFF0B0B0D),
-            0.85f to Color(0xFF17181C),
-            1f to Color(0xFF0A0A0B),
-            center = center,
-            radius = r * 0.56f,
-        ),
-        radius = r * 0.56f,
-    )
-    listOf(0.36f, 0.42f, 0.48f, 0.54f).forEachIndexed { i, k ->
-        drawCircle(Color(0xFF2A2B31).copy(alpha = 0.9f - i * 0.15f), radius = r * k, style = Stroke(1.dp.toPx()))
-    }
-    // a faint light from above on the outer ring
-    drawArc(
-        Color.White.copy(alpha = 0.08f), 200f, 140f, false,
-        Offset(center.x - r * 0.54f, center.y - r * 0.54f), Size(r * 1.08f, r * 1.08f),
-        style = Stroke(3.dp.toPx()),
-    )
-    val ringR = r * 0.48f
-    drawArc(
-        fillTint, 65f, 50f, false,
-        Offset(center.x - ringR, center.y - ringR), Size(2 * ringR, 2 * ringR),
-        style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
-    )
-    // bolt
-    val s = r * 0.035f
-    val bolt = Path().apply {
-        val o = center + Offset(0f, r * 0.37f)
-        moveTo(o.x + 0.2f * s, o.y - s)
-        lineTo(o.x - 0.6f * s, o.y + 0.1f * s)
-        lineTo(o.x, o.y + 0.1f * s)
-        lineTo(o.x - 0.2f * s, o.y + s)
-        lineTo(o.x + 0.6f * s, o.y - 0.1f * s)
-        lineTo(o.x, o.y - 0.1f * s)
-        close()
-    }
-    drawPath(bolt, Color.White.copy(alpha = 0.8f))
-    val range = text.measure("210 km", TextStyle(color = Color.White.copy(alpha = 0.6f), fontSize = (r * 0.05f / density / fontScale).sp))
-    drawText(range, topLeft = center + Offset(-range.size.width / 2f, r * 0.6f))
 }
 
 @Composable

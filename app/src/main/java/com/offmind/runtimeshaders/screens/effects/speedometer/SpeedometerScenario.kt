@@ -94,3 +94,17 @@ fun cycleHueAt(t: Float, oklch: Boolean): Float = wrapHue(hueStart(oklch) - HueS
 fun speedHue(speed: Float, oklch: Boolean): Float = wrapHue(hueStart(oklch) - speed * 1.5f)
 
 fun wrapHue(h: Float): Float = ((h % 360f) + 360f) % 360f
+
+// How bright the fill is: a dim, see-through glow at low speed, overexposed only near the top.
+// A square of the (smoothed) speed: slow to start, so 63 km/h stays dim.
+fun exposureAt(fillSpeed: Float): Float {
+    val s = (fillSpeed / 221f).coerceIn(0f, 1f)
+    return 0.2f + 0.8f * s * s
+}
+
+// Chromatic aberration past the redline: 0 at 200 km/h, 1 at 240, smoothstep so there is no
+// kink where it starts.
+fun aberrationAt(speed: Float): Float {
+    val x = ((speed - 200f) / 40f).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}

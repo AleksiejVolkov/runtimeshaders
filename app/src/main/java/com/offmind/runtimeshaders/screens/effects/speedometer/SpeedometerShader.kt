@@ -15,6 +15,7 @@ internal val speedFillShader = """
     uniform float fill;        // 0..1 of the sweep, already smoothed
     uniform float hue;         // 0..1
     uniform float time;        // s
+    uniform float exposure;    // grows with speed: dim at low speed, overexposed near the top
     uniform float model;       // 0: paint (HSV, mix with white), 1: light (OKLCH, linear, tonemapped)
 
     const float TAU = 6.2831853;
@@ -102,17 +103,34 @@ internal val speedFillShader = """
         if (model < 0.5) {
             // paint: a colour, and white mixed in near the rim
             float3 colour = hsv(hue, 0.9, 1.0);
-            rgb = mix(colour * glow * smoke, float3(1.0), core * 0.85) * strength;
+            rgb = mix(colour * glow * smoke, float3(1.0), core * 0.85) * strength * exposure;
         } else {
             // light: a colour of constant lightness, times an intensity far above 1 at the rim;
             // the tonemap lets the strong channel saturate and pulls the others up to white
             float3 colour = oklchToLinear(0.55, 0.2, hue);
             float hot = exp(-depth * 12.0);
-            float intensity = smoke * (14.0 * hot + 1.2 * glow) * strength;
+            float intensity = smoke * (14.0 * hot + 1.2 * glow) * strength * exposure;
             float3 linear = 1.0 - exp(-colour * intensity);
             rgb = pow(linear, float3(1.0 / 2.2)); // the shader writes sRGB-encoded values
         }
         // additive: the alpha only says how much light there is
         return half4(rgb, clamp(max(rgb.r, max(rgb.g, rgb.b)), 0.0, 1.0));
+    }
+"""
+
+// Past the redline the whole dial splits: red is sampled a little further out from the centre,
+// blue a little further in, more towards the rim.
+@Language("AGSL")
+internal val aberrationShader = """
+    uniform shader image;
+    uniform float2 center;
+    uniform float amount;      // fraction of the distance from the centre
+
+    half4 main(float2 xy) {
+        float2 shift = (xy - center) * amount;
+        half4 c = image.eval(xy);
+        half4 r = image.eval(xy - shift);
+        half4 b = image.eval(xy + shift);
+        return half4(r.r, c.g, b.b, max(c.a, max(r.a, b.a)));
     }
 """
