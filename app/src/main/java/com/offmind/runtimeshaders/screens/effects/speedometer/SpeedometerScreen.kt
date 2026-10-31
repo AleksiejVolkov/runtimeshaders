@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -48,6 +50,7 @@ import kotlin.math.sin
 // 150° → 390°.
 private const val StartDeg = 150f
 private const val SweepDeg = 240f
+private const val InnerBand = 0.75f
 private const val RedlineFrom = 200f
 private const val HoldAtTop = 1.2f // s, before the launch repeats
 private val Red = Color(0xFFFF3B30)
@@ -74,10 +77,12 @@ fun SpeedometerScreen() {
     }
 
     val speed = speedAt(time)
+    val fillSpeed = speed
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Speedometer(
             speed = speed,
+            fill = fillSpeed / MaxSpeed,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         Row(
@@ -101,17 +106,33 @@ fun SpeedometerScreen() {
 @Composable
 private fun Speedometer(
     speed: Float,
+    fill: Float,
     modifier: Modifier,
 ) {
+    val shader = remember { RuntimeShader(speedFillShader) }
+    val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
     val tint = Red
     val redlineTint = Red
 
+    // feeds the fill shader
+    fun DrawScope.drawFill() {
+        shader.setFloatUniform("center", center.x, center.y)
+        shader.setFloatUniform("radius", dialRadius())
+        shader.setFloatUniform("inner", InnerBand)
+        shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
+        shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
+        shader.setFloatUniform("fill", fill)
+        drawRect(brush)
+    }
+
     Box(modifier) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(tint, text) }
+        // the fill
+        Canvas(Modifier.matchParentSize()) { drawFill() }
         // scale, labels, redline, needle and the number stay crisp and white over the fill
-        Canvas(Modifier.matchParentSize()) { drawDial(speed, 0f, redlineTint, text) }
+        Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, redlineTint, text) }
     }
 }
 
