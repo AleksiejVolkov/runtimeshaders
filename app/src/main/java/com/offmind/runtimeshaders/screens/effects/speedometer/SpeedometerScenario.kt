@@ -83,13 +83,14 @@ fun timeOfSpeed(speed: Float): Float {
 }
 
 // Hue in degrees. It keeps turning at 350°/s towards smaller values (blue, cyan, green...),
-// starting where the redline (fill + 150°) is red.
-const val HueStart = 210f
+// starting where the redline (fill + 150°) is red: red is 0° in HSV and about 29° in OKLCH.
 const val HueSpeed = 350f
 const val RedlineHueOffset = 150f
 
-fun cycleHueAt(t: Float): Float = wrapHue(HueStart - HueSpeed * t)
+fun hueStart(oklch: Boolean) = if (oklch) 29f - RedlineHueOffset else 360f - RedlineHueOffset
 
-fun speedHue(speed: Float): Float = wrapHue(HueStart - speed * 1.5f)
+fun cycleHueAt(t: Float, oklch: Boolean): Float = wrapHue(hueStart(oklch) - HueSpeed * t)
+
+fun speedHue(speed: Float, oklch: Boolean): Float = wrapHue(hueStart(oklch) - speed * 1.5f)
 
 fun wrapHue(h: Float): Float = ((h % 360f) + 360f) % 360f

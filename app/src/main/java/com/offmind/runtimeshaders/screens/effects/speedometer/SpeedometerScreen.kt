@@ -66,6 +66,7 @@ fun SpeedometerScreen() {
     var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     var playing by remember { mutableStateOf(true) }
     var hueMode by remember { mutableStateOf(HueMode.Cycle) }
+    var light by remember { mutableStateOf(true) } // light (OKLCH, tonemap) or paint (HSV, mix)
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -87,8 +88,8 @@ fun SpeedometerScreen() {
     val speed = speedAt(time)
     val fillSpeed = fillSpeedAt(time)
     val hue = when (hueMode) {
-        HueMode.Cycle -> cycleHueAt(time)
-        HueMode.Speed -> speedHue(fillSpeed)
+        HueMode.Cycle -> cycleHueAt(time, light)
+        HueMode.Speed -> speedHue(fillSpeed, light)
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -96,6 +97,7 @@ fun SpeedometerScreen() {
             speed = speed,
             fill = fillSpeed / MaxSpeed,
             hue = hue,
+            light = light,
             clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
@@ -114,12 +116,20 @@ fun SpeedometerScreen() {
                 }
             }
             Chip(hueMode.label) { hueMode = HueMode.entries[(hueMode.ordinal + 1) % 2] }
+            Chip(if (light) "light" else "paint") { light = !light }
         }
     }
 }
 
 @Composable
-private fun Speedometer(speed: Float, fill: Float, hue: Float, clock: Float, modifier: Modifier) {
+private fun Speedometer(
+    speed: Float,
+    fill: Float,
+    hue: Float,
+    light: Boolean,
+    clock: Float,
+    modifier: Modifier,
+) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
@@ -135,12 +145,13 @@ private fun Speedometer(speed: Float, fill: Float, hue: Float, clock: Float, mod
         shader.setFloatUniform("fill", fill)
         shader.setFloatUniform("hue", hue / 360f)
         shader.setFloatUniform("time", clock)
+        shader.setFloatUniform("model", if (light) 1f else 0f)
         drawRect(brush, alpha = alpha, blendMode = blendMode)
     }
 
     Box(modifier) {
         // the hub sits under everything
-        Canvas(Modifier.matchParentSize()) { drawHub(hue, text) }
+        Canvas(Modifier.matchParentSize()) { drawHub(tint(hue, light), text) }
         // bloom: the same fill, blurred in its own layer
         Canvas(
             Modifier
@@ -150,7 +161,9 @@ private fun Speedometer(speed: Float, fill: Float, hue: Float, clock: Float, mod
         // the sharp fill, added on top of its glow
         Canvas(Modifier.matchParentSize()) { drawFill(alpha = 1f, blendMode = BlendMode.Plus) }
         // scale, labels, redline, needle and the number stay crisp and white over the glow
-        Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, hue, text) }
+        Canvas(Modifier.matchParentSize()) {
+            drawDial(speed, fill, tint(hue + RedlineHueOffset, light), text)
+        }
     }
 }
 
@@ -163,10 +176,27 @@ private fun DrawScope.pointAt(angleDeg: Float, r: Float): Offset {
 
 private fun angleOf(speed: Float) = StartDeg + SweepDeg * (speed / MaxSpeed).coerceIn(0f, 1f)
 
-private fun hsv(hue: Float, s: Float = 0.9f, v: Float = 1f) =
-    Color.hsv(wrapHue(hue), s, v)
+// The colour of the redline and the charge segment, in the same model as the fill.
+private fun tint(hue: Float, light: Boolean): Color =
+    if (light) oklch(0.66f, 0.17f, hue) else Color.hsv(wrapHue(hue), 0.9f, 1f)
 
-private fun DrawScope.drawDial(speed: Float, fill: Float, hue: Float, text: TextMeasurer) {
+private fun oklch(l: Float, c: Float, hueDeg: Float): Color {
+    val h = Math.toRadians(wrapHue(hueDeg).toDouble())
+    val a = c * cos(h).toFloat()
+    val b = c * sin(h).toFloat()
+    fun cube(x: Float) = x * x * x
+    val l1 = cube(l + 0.3963377774f * a + 0.2158037573f * b)
+    val m1 = cube(l - 0.1055613458f * a - 0.0638541728f * b)
+    val s1 = cube(l - 0.0894841775f * a - 1.2914855480f * b)
+    fun encode(x: Float) = Math.pow(x.coerceIn(0f, 1f).toDouble(), 1 / 2.2).toFloat()
+    return Color(
+        encode(4.0767416621f * l1 - 3.3077115913f * m1 + 0.2309699292f * s1),
+        encode(-1.2684380046f * l1 + 2.6097574011f * m1 - 0.3413193965f * s1),
+        encode(-0.0041960863f * l1 - 0.7034186147f * m1 + 1.7076147010f * s1),
+    )
+}
+
+private fun DrawScope.drawDial(speed: Float, fill: Float, redlineTint: Color, text: TextMeasurer) {
     val r = dialRadius()
     val arcTopLeft = Offset(center.x - r, center.y - r)
     val arcSize = Size(2 * r, 2 * r)
@@ -201,7 +231,7 @@ private fun DrawScope.drawDial(speed: Float, fill: Float, hue: Float, text: Text
     }
 
     // redline outside the scale, in the complementary colour, with a faint glow
-    val red = hsv(hue + RedlineHueOffset)
+    val red = redlineTint
     val redR = r * 1.07f
     val redTopLeft = Offset(center.x - redR, center.y - redR)
     val redSize = Size(2 * redR, 2 * redR)
@@ -228,7 +258,7 @@ private fun DrawScope.drawDial(speed: Float, fill: Float, hue: Float, text: Text
 
 // A recessed hub of dark concentric rings around the centre circle, with a short coloured
 // segment along its lower arc (charge / range), a bolt and "210 km".
-private fun DrawScope.drawHub(hue: Float, text: TextMeasurer) {
+private fun DrawScope.drawHub(fillTint: Color, text: TextMeasurer) {
     val r = dialRadius()
     drawCircle(
         Brush.radialGradient(
@@ -252,7 +282,7 @@ private fun DrawScope.drawHub(hue: Float, text: TextMeasurer) {
     )
     val ringR = r * 0.48f
     drawArc(
-        hsv(hue), 65f, 50f, false,
+        fillTint, 65f, 50f, false,
         Offset(center.x - ringR, center.y - ringR), Size(2 * ringR, 2 * ringR),
         style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
     )
