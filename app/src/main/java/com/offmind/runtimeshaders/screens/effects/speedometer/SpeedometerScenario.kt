@@ -1,5 +1,7 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import kotlin.math.min
+
 // A launch from 0 to 221 km/h in 5.6 s: (time s, speed km/h).
 private val Keyframes = listOf(
     0.0f to 0f,
@@ -47,6 +49,25 @@ fun speedAt(t: Float): Float {
     val s3 = s2 * s
     return (2 * s3 - 3 * s2 + 1) * v0 + (s3 - 2 * s2 + s) * h * slopes[i] +
         (-2 * s3 + 3 * s2) * v1 + (s3 - s2) * h * slopes[i + 1]
+}
+
+// The fill follows the speed on a critically damped spring, so it lags behind the number.
+// It is integrated from the start every time, which makes any moment reproducible.
+private const val Stiffness = 16f // rad/s: about 120 at 126 km/h and 165 at 170
+private const val Step = 1f / 240f
+
+fun fillSpeedAt(t: Float): Float {
+    var x = 0f
+    var v = 0f
+    var time = 0f
+    while (time < t) {
+        val dt = min(Step, t - time)
+        val a = Stiffness * Stiffness * (speedAt(time) - x) - 2f * Stiffness * v
+        v += a * dt
+        x += v * dt
+        time += dt
+    }
+    return x
 }
 
 // The first moment the speed reaches [speed]: the scenario only goes up, so bisect.
