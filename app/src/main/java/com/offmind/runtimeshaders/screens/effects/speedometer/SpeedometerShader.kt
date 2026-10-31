@@ -120,7 +120,11 @@ internal val speedFillShader = """
             float body = exp(-depth * 3.5) * density;
             // the rim heats up faster than the body: white appears only at speed
             float intensity = (30.0 * exposure * rimHeat + 1.8 * body) * strength * exposure;
-            float3 linear = tonemap(colour * intensity);
+            // inset (as in AgX): every channel gets a little of the others, the way the eye's
+            // sensitivities overlap; without it a colour at the gamut edge has zeros that no
+            // intensity can lift, and the core never turns white
+            float3 inset = mix(colour, float3((colour.r + colour.g + colour.b) / 3.0), 0.12);
+            float3 linear = tonemap(inset * intensity);
             rgb = pow(linear, float3(1.0 / 2.2)); // the shader writes sRGB-encoded values
         }
         // additive: the alpha only says how much light there is
