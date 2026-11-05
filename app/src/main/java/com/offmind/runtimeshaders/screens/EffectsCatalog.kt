@@ -21,6 +21,7 @@ import com.offmind.runtimeshaders.screens.effects.metalknob.MetalKnobScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismAccentsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismBasicsScreen
 import com.offmind.runtimeshaders.screens.effects.neumorphism.NeumorphismThermostatScreen
+import com.offmind.runtimeshaders.screens.effects.speedometer.SpeedometerScreen
 
 // Add an effect and its screen together in the appropriate category. Categories can nest freely;
 // neither new effects nor new categories need their own Route or AppNavDisplay registration.
@@ -116,6 +117,11 @@ internal val effectsCatalog = EffectCatalog(
                                 title = "Metal Knob",
                                 description = "A brushed steel knob lit by tilting the phone",
                             ) { MetalKnobScreen() },
+                            EffectScreenData(
+                                id = "speedometer",
+                                title = "Speedometer",
+                                description = "A launch to 221 km/h and back: every speed has its color",
+                            ) { SpeedometerScreen() },
                         ),
                     ),
                 ),
