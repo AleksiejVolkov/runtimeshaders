@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.ui.util.lerp
 
@@ -140,3 +141,10 @@ fun tearAt(speed: Float) = lerp(1f, 2.4f, share(speed))
 
 // How bright the fill is: a dim, see-through glow at low speed, overexposed only near the top.
 fun exposureAt(speed: Float) = lerp(0.2f, 1f, EaseIn.transform(share(speed)))
+
+// How far the dial has come apart past the redline: a curve that is zero up to 200 km/h. Then
+// it jumps at once, holds on a shelf, and hits at 240. The speed here is the real one: the
+// needle crosses the line, the lagging fill does not decide when it breaks.
+private val BreakLoose = CubicBezierEasing(0f, 0.8f, 1f, 0.25f)
+
+fun breakdownAt(speed: Float) = BreakLoose.transform(((speed - 200f) / 40f).coerceIn(0f, 1f))
