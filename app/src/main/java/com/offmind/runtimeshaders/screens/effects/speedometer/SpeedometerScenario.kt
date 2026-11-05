@@ -122,3 +122,10 @@ fun warpAt(speed: Float) = 1.2f + 1.6f * share(speed)
 
 // How deep the inner edge is torn, in rims.
 fun tearAt(speed: Float) = 0.1f + 0.14f * share(speed)
+
+// How bright the fill is: a dim, see-through glow at low speed, overexposed only near the top.
+// A square of the speed: slow to start, so 63 km/h stays dim.
+fun exposureAt(speed: Float): Float {
+    val s = (speed / 221f).coerceIn(0f, 1f)
+    return 0.2f + 0.8f * s * s
+}

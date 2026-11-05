@@ -30,13 +30,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -114,6 +117,7 @@ fun SpeedometerScreen() {
             speed = speed,
             fill = fill / MaxSpeed,
             tint = colorAt(fill).toEncodedColor(),
+            exposure = exposureAt(fill),
             flow = flow,
             stretch = stretchAt(fill),
             warp = warpAt(fill),
@@ -148,6 +152,7 @@ private fun Speedometer(
     speed: Float,
     fill: Float,
     tint: Color,
+    exposure: Float,
     flow: Float,
     stretch: Float,
     warp: Float,
@@ -159,7 +164,9 @@ private fun Speedometer(
     val brush = remember { ShaderBrush(shader) }
     val ramp = remember { ramp() }
     val text = rememberTextMeasurer()
-    fun DrawScope.drawFill() {
+
+    // feeds the fill shader; both fill layers draw the same thing
+    fun DrawScope.drawFill(alpha: Float, blendMode: BlendMode) {
         shader.setFloatUniform("center", center.x, center.y)
         shader.setFloatUniform("radius", dialRadius())
         shader.setFloatUniform("inner", InnerBand)
@@ -167,18 +174,28 @@ private fun Speedometer(
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
         shader.setFloatUniform("ramp", ramp)
+        shader.setFloatUniform("exposure", exposure)
         shader.setFloatUniform("flow", flow)
         shader.setFloatUniform("stretch", stretch)
         shader.setFloatUniform("warp", warp)
         shader.setFloatUniform("tear", tear)
         shader.setFloatUniform("time", clock)
-        drawRect(brush, blendMode = BlendMode.Plus)
+        drawRect(brush, alpha = alpha, blendMode = blendMode)
     }
 
     Box(modifier) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(tint, text) }
-        Canvas(Modifier.matchParentSize()) { drawFill() }
+        // bloom: the same fill, blurred in its own layer
+        Canvas(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    renderEffect = BlurEffect(10.dp.toPx(), 10.dp.toPx(), TileMode.Decal)
+                }
+        ) { drawFill(alpha = 0.55f, blendMode = BlendMode.SrcOver) }
+        // the sharp fill, added on top of its glow
+        Canvas(Modifier.matchParentSize()) { drawFill(alpha = 1f, blendMode = BlendMode.Plus) }
         // scale, labels, redline, needle and the number stay crisp and white over the fill
         Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, text) }
     }
