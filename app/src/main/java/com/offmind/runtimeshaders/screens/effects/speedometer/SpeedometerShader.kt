@@ -20,6 +20,7 @@ internal val speedFillShader = """
     const float stretch = 2.0;  // wisps drawn out along the arc
     const float tear = 1.7;     // depth of the torn inner edge, as a share of the width
     const float warp = 2.0;     // how far one noise pushes the other
+    const float exposure = 0.7; // how bright
 
     float hash(float2 p) {
         p = fract(p * float2(123.34, 456.21));
@@ -52,6 +53,12 @@ internal val speedFillShader = """
     // two octaves: enough to push the coordinates of another noise
     float fbm2(float2 p) {
         return (noise(p) + 0.5 * noise(p * 2.03 + float2(17.1, 3.7))) / 1.5 * 0.9375;
+    }
+
+    // filmic curve (ACES fit by Narkowicz): a toe that keeps the dark parts deep and a soft
+    // shoulder, per channel
+    float3 tonemap(float3 x) {
+        return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
     }
 
     half4 main(float2 xy) {
@@ -96,7 +103,16 @@ internal val speedFillShader = """
         float density = wisps * mix(0.35, 1.6, smoothstep(0.25, 0.7, fine));
         density += pow(fine, 5.0) * 2.0;
         float body = exp(-depth * 2.2) * density;
-        float3 linear = min(c * body * strength, float3(1.0));
+        // far above 1 only in a thin band at the rim, and only at speed: the smoke is seen at
+        // any speed, the rim heats up as the car goes faster
+        float rimHeat = exp(-depth * 40.0) * mix(0.75, 1.0, fine);
+        float intensity = (11.0 * exposure * exposure * rimHeat
+            + 0.95 * (0.4 + 0.3 * exposure) * body) * strength;
+        // inset (as in AgX): every channel gets a little of the others, the way the eye's
+        // sensitivities overlap; without it a color at the gamut edge has zeros that no
+        // intensity can lift, and the rim never turns white
+        float3 inset = mix(c, float3((c.r + c.g + c.b) / 3.0), 0.12);
+        float3 linear = tonemap(inset * intensity);
         float3 rgb = pow(linear, float3(1.0 / 2.2)); // the shader writes sRGB-encoded values
         // the alpha only says how much light there is
         return half4(rgb, clamp(max(rgb.r, max(rgb.g, rgb.b)), 0.0, 1.0));
