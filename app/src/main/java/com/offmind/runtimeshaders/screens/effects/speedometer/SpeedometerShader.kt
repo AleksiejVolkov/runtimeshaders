@@ -46,6 +46,11 @@ internal val speedFillShader = """
         return value;
     }
 
+    // two octaves: enough to push the coordinates of another noise
+    float fbm2(float2 p) {
+        return (noise(p) + 0.5 * noise(p * 2.03 + float2(17.1, 3.7))) / 1.5 * 0.9375;
+    }
+
     half4 main(float2 xy) {
         float2 d = xy - center;
         float r = length(d) / radius;
@@ -63,8 +68,10 @@ internal val speedFillShader = """
 
         // both coordinates in rims, so one frequency means round wisps
         float2 p = float2(along * MIDDLE * 6.0 - time * 0.9, r * 6.0);
-        float coarse = fbm(p);
-        float fine = fbm(p * 2.6 + 5.3);
+        // domain warping: one noise moves the coordinates of the other
+        float2 q = float2(fbm2(p + time * 0.15), fbm2(p + float2(5.2, 1.3) - time * 0.12));
+        float coarse = fbm(p + 2.0 * q);
+        float fine = fbm(p * 2.6 + 4.0 * q + 5.3);
 
         // the inner edge is torn by the smoke, the outer one is clean
         float edge = inner + (coarse - 0.5) * 0.5 + (fine - 0.5) * 0.06;
