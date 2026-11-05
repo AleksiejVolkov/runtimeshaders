@@ -116,6 +116,7 @@ fun SpeedometerScreen() {
             speed = speed,
             fill = fill / MaxSpeed,
             tint = colorAt(fill),
+            exposure = exposureAt(fill),
             flow = flow,
             stretch = stretchAt(fill),
             warp = warpAt(fill),
@@ -151,6 +152,7 @@ private fun Speedometer(
     speed: Float,
     fill: Float,
     tint: Color,
+    exposure: Float,
     flow: Float,
     stretch: Float,
     warp: Float,
@@ -172,6 +174,7 @@ private fun Speedometer(
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
         shader.setFloatUniform("stops", stops)
+        shader.setFloatUniform("exposure", exposure)
         shader.setFloatUniform("flow", flow)
         shader.setFloatUniform("stretch", stretch)
         shader.setFloatUniform("warp", warp)

@@ -137,3 +137,6 @@ fun warpAt(speed: Float) = lerp(1.2f, 2.8f, share(speed))
 
 // How deep the inner edge is torn, as a share of the width: a thin band keeps its shape.
 fun tearAt(speed: Float) = lerp(1f, 2.4f, share(speed))
+
+// How bright the fill is: a dim, see-through glow at low speed, overexposed only near the top.
+fun exposureAt(speed: Float) = lerp(0.2f, 1f, EaseIn.transform(share(speed)))

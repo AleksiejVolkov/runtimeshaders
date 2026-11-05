@@ -12,6 +12,7 @@ internal val speedFillShader = """
     uniform float sweep;       // radians from 0 to 240 km/h
     uniform float fill;        // 0..1 of the sweep
     uniform float3 stops[4];   // colors at 0, 120, 200 and 240 km/h
+    uniform float exposure;    // how bright: dim at low speed, overexposed near the top
     uniform float flow;        // accumulated: how far the smoke has moved along the arc
     uniform float stretch;     // >= 1: wisps drawn out along the arc
     uniform float warp;        // how far one noise pushes the other
@@ -21,7 +22,6 @@ internal val speedFillShader = """
 
     const float TAU = 6.2831853;
     const float MIDDLE = 0.875; // the radius where one noise cell along the arc is measured
-    const float exposure = 0.7; // how bright
 
     float hash(float2 p) {
         p = fract(p * float2(123.34, 456.21));
