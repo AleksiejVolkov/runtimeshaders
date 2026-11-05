@@ -12,6 +12,7 @@ internal val speedFillShader = """
     uniform float startAngle;  // radians, where 0 km/h is; angles grow clockwise on screen
     uniform float sweep;       // radians from 0 to 240 km/h
     uniform float fill;        // 0..1 of the sweep
+    uniform float3 ramp[25];   // linear light every 10 km/h: each point has its speed's color
     uniform float flow;        // accumulated: how far the smoke has moved along the arc
     uniform float stretch;     // >= 1: wisps drawn out along the arc
     uniform float warp;        // how far one noise pushes the other
@@ -20,7 +21,6 @@ internal val speedFillShader = """
 
     const float TAU = 6.2831853;
     const float MIDDLE = 0.875; // the middle of the band, in rims
-    const float3 COLOR = float3(0.023, 0.044, 0.745); // #2A3BE0 in linear light
 
     float hash(float2 p) {
         p = fract(p * float2(123.34, 456.21));
@@ -83,6 +83,14 @@ internal val speedFillShader = """
         float rim = smoothstep(1.005, 0.985, r);
         float strength = band * rim * front;
 
+        // the color of the speed this point of the arc stands for; AGSL can index an array
+        // only with a loop counter
+        float3 c = ramp[0];
+        float x = along / sweep * 24.0;
+        for (int i = 0; i < 24; i++) {
+            if (x >= float(i)) c = mix(ramp[i], ramp[i + 1], min(x - float(i), 1.0));
+        }
+
         // light falls off from the rim inwards
         float depth = 1.0 - r;
         // the smoke leaves dark gaps in the body
@@ -90,7 +98,7 @@ internal val speedFillShader = """
         float density = wisps * mix(0.35, 1.6, smoothstep(0.25, 0.7, fine));
         density += pow(fine, 5.0) * 2.0;
         float body = exp(-depth * 2.2) * density;
-        float3 linear = min(COLOR * body * strength, float3(1.0));
+        float3 linear = min(c * body * strength, float3(1.0));
         float3 rgb = pow(linear, float3(1.0 / 2.2)); // the shader writes sRGB-encoded values
         // the alpha only says how much light there is
         return half4(rgb, clamp(max(rgb.r, max(rgb.g, rgb.b)), 0.0, 1.0));

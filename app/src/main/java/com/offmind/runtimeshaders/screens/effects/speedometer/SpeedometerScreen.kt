@@ -56,7 +56,6 @@ private const val SweepDeg = 240f
 private const val InnerBand = 0.7f
 private const val RedlineFrom = 200f
 private val Redline = Color(0xFFFF3020) // where the scale ends
-private val Tint = Color(0xFF2A3BE0)
 
 @Composable
 fun SpeedometerScreen() {
@@ -114,6 +113,7 @@ fun SpeedometerScreen() {
         Speedometer(
             speed = speed,
             fill = fill / MaxSpeed,
+            tint = colorAt(fill).toEncodedColor(),
             flow = flow,
             stretch = stretchAt(fill),
             warp = warpAt(fill),
@@ -147,6 +147,7 @@ fun SpeedometerScreen() {
 private fun Speedometer(
     speed: Float,
     fill: Float,
+    tint: Color,
     flow: Float,
     stretch: Float,
     warp: Float,
@@ -156,6 +157,7 @@ private fun Speedometer(
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
+    val ramp = remember { ramp() }
     val text = rememberTextMeasurer()
     fun DrawScope.drawFill() {
         shader.setFloatUniform("center", center.x, center.y)
@@ -164,6 +166,7 @@ private fun Speedometer(
         shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
+        shader.setFloatUniform("ramp", ramp)
         shader.setFloatUniform("flow", flow)
         shader.setFloatUniform("stretch", stretch)
         shader.setFloatUniform("warp", warp)
@@ -174,7 +177,7 @@ private fun Speedometer(
 
     Box(modifier) {
         // the hub sits under everything
-        Canvas(Modifier.matchParentSize()) { drawHub(Tint, text) }
+        Canvas(Modifier.matchParentSize()) { drawHub(tint, text) }
         Canvas(Modifier.matchParentSize()) { drawFill() }
         // scale, labels, redline, needle and the number stay crisp and white over the fill
         Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, text) }
