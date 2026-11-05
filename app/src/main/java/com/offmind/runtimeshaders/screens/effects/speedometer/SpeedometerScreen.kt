@@ -65,6 +65,7 @@ fun SpeedometerScreen() {
     var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     val launch = remember { Launch() }
     var fill by remember { mutableFloatStateOf(0f) }
+    var flow by remember { mutableFloatStateOf(0f) }
     var playing by remember { mutableStateOf(true) }
     var frozen by remember { mutableStateOf(false) } // the same moment, for comparisons
     var controls by remember { mutableStateOf(true) } // tap the screen: a clean frame
@@ -85,6 +86,7 @@ fun SpeedometerScreen() {
                     }
                     launch.advance(speedAt(time), dt)
                     fill = launch.fill
+                    flow = launch.flow
                 }
                 last = now
             }
@@ -97,6 +99,7 @@ fun SpeedometerScreen() {
         time = timeOfSpeed(target.toFloat())
         launch.seek(time)
         fill = launch.fill
+        flow = launch.flow
         clock = 10f + time
     }
 
@@ -113,6 +116,11 @@ fun SpeedometerScreen() {
             speed = speed,
             fill = fill / MaxSpeed,
             tint = colorAt(fill),
+            flow = flow,
+            stretch = stretchAt(fill),
+            warp = warpAt(fill),
+            tear = tearAt(fill),
+            width = widthAt(fill),
             clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
@@ -143,6 +151,11 @@ private fun Speedometer(
     speed: Float,
     fill: Float,
     tint: Color,
+    flow: Float,
+    stretch: Float,
+    warp: Float,
+    tear: Float,
+    width: Float,
     clock: Float,
     modifier: Modifier,
 ) {
@@ -159,6 +172,11 @@ private fun Speedometer(
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
         shader.setFloatUniform("stops", stops)
+        shader.setFloatUniform("flow", flow)
+        shader.setFloatUniform("stretch", stretch)
+        shader.setFloatUniform("warp", warp)
+        shader.setFloatUniform("tear", tear)
+        shader.setFloatUniform("width", width)
         shader.setFloatUniform("time", clock)
         drawRect(brush, alpha = alpha, blendMode = blendMode)
     }

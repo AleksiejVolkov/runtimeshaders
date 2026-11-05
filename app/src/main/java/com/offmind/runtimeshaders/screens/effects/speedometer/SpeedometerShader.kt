@@ -12,14 +12,15 @@ internal val speedFillShader = """
     uniform float sweep;       // radians from 0 to 240 km/h
     uniform float fill;        // 0..1 of the sweep
     uniform float3 stops[4];   // colors at 0, 120, 200 and 240 km/h
+    uniform float flow;        // accumulated: how far the smoke has moved along the arc
+    uniform float stretch;     // >= 1: wisps drawn out along the arc
+    uniform float warp;        // how far one noise pushes the other
+    uniform float tear;        // depth of the torn inner edge, as a share of the width
+    uniform float width;       // of the band of smoke, in rims
     uniform float time;        // s
 
     const float TAU = 6.2831853;
     const float MIDDLE = 0.875; // the radius where one noise cell along the arc is measured
-    const float width = 0.3;    // of the band of smoke, in rims
-    const float stretch = 2.0;  // wisps drawn out along the arc
-    const float tear = 1.7;     // depth of the torn inner edge, as a share of the width
-    const float warp = 2.0;     // how far one noise pushes the other
     const float exposure = 0.7; // how bright
 
     float hash(float2 p) {
@@ -77,7 +78,7 @@ internal val speedFillShader = """
         if (front <= 0.0) return half4(0.0);
 
         // both coordinates in rims, so one frequency means round wisps
-        float2 p = float2(along * MIDDLE / stretch * 6.0 - time * 1.6, r * 6.0);
+        float2 p = float2(along * MIDDLE / stretch * 6.0 - flow, r * 6.0);
         // domain warping: one noise moves the coordinates of the other
         float2 q = float2(fbm2(p + time * 0.15), fbm2(p + float2(5.2, 1.3) - time * 0.12));
         float coarse = fbm(p + warp * q);

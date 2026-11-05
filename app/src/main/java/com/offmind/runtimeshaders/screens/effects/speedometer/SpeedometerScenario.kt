@@ -1,5 +1,8 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import androidx.compose.animation.core.Easing
+import androidx.compose.ui.util.lerp
+
 // A launch from 0 to 240 km/h, half a second at the top, then the foot comes off the gas and
 // the car coasts back to 0: (time s, speed km/h). The way down is its own curve, not the launch
 // reversed.
@@ -71,12 +74,15 @@ fun timeOfSpeed(speed: Float): Float {
     return hi
 }
 
-// The fill follows the speed on a critically damped spring, so it lags behind the number.
+// What accumulates over time. The fill follows the speed on a critically damped spring, so it
+// lags behind the number. The flow is a sum of rate * dt, not time * rate: the rate changes
+// with speed, and a product would send the whole smoke rushing whenever the speed changes.
 private const val Stiffness = 16f // rad/s: about 120 at 126 km/h and 165 at 170
 private const val Step = 1f / 240f
 
 class Launch {
     var fill = 0f
+    var flow = 0f
     private var velocity = 0f
     private var left = 0f
 
@@ -87,12 +93,14 @@ class Launch {
             val a = Stiffness * Stiffness * (target - fill) - 2f * Stiffness * velocity
             velocity += a * Step
             fill += velocity * Step
+            flow += flowRate(fill) * Step
         }
     }
 
     // Where everything would be at [t] of the scenario: the same frame every time.
     fun seek(t: Float) {
         fill = 0f
+        flow = 0f
         velocity = 0f
         left = 0f
         var time = 0f
@@ -102,3 +110,30 @@ class Launch {
         }
     }
 }
+
+// One number drives the smoke, and it is not time. Every parameter is a low value, a high
+// value and a curve between them; the input is the fill speed as a share of the whole scale.
+private fun share(speed: Float) = (speed / MaxSpeed).coerceIn(0f, 1f)
+
+// Slow to start: most of the change comes late.
+private val EaseIn = Easing { it * it }
+
+// Slow at both ends. Compose has no smoothstep, but an Easing is one line.
+private val Smoothstep = Easing { it * it * (3f - 2f * it) }
+
+// How wide the band of smoke is, in rims: pressed to the rim at low speed, growing fast in the
+// middle of the scale, and by 200 km/h it has all the room it needs.
+fun widthAt(speed: Float) =
+    lerp(0.05f, 0.30f, Smoothstep.transform((speed / 200f).coerceIn(0f, 1f)))
+
+// How much the wisps are drawn out along the arc.
+fun stretchAt(speed: Float) = lerp(1f, 4f, EaseIn.transform(share(speed)))
+
+// How fast the smoke runs along the arc, in noise cells per second.
+fun flowRate(speed: Float) = lerp(0.25f, 3.45f, share(speed))
+
+// How far one noise pushes the coordinates of the other.
+fun warpAt(speed: Float) = lerp(1.2f, 2.8f, share(speed))
+
+// How deep the inner edge is torn, as a share of the width: a thin band keeps its shape.
+fun tearAt(speed: Float) = lerp(1f, 2.4f, share(speed))
