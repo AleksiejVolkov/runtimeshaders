@@ -122,9 +122,9 @@ internal val speedFillShader = """
 
 // Past the redline the whole dial starts to come apart. One effect on the dial's layer: the
 // color channels split and tremble, the split direction wanders between the radius and the
-// tangent, short bursts kick in more often towards 240, thin arc bands of the dial slip around
-// the centre, the whole dial shakes by a pixel or two and its brightness flickers. k is 0 at
-// 200 km/h and 1 at 240.
+// tangent, short bursts grow towards 240, thin arc bands of the dial slip around the centre,
+// the whole dial shakes by a few pixels and its brightness flickers. k is 0 at 200 km/h and 1
+// at 240.
 @Language("AGSL")
 internal val breakdownShader = """
     uniform shader image;
@@ -145,8 +145,8 @@ internal val breakdownShader = """
 
     half4 main(float2 xy) {
         // time in short slots: a burst or a band lives for one slot. Half of the slots burst as
-        // soon as k leaves zero: the kick at the redline must not depend on luck. Only the size
-        // of a burst grows with k
+        // soon as k leaves zero, so the kick usually comes right at the redline, though a run of
+        // slots can still miss it. Only the size of a burst grows with k
         float slot = floor(time * 14.0);
         float burst = step(1.0 - 0.5 * smoothstep(0.0, 0.15, k), hash(slot + 7.1));
 
