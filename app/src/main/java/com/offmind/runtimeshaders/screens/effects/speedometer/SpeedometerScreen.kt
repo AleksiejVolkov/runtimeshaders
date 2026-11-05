@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -123,6 +125,7 @@ fun SpeedometerScreen() {
             warp = warpAt(fill),
             tear = tearAt(fill),
             clock = clock,
+            breakdown = breakdownAt(speed),
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         if (controls) Column(
@@ -158,11 +161,13 @@ private fun Speedometer(
     warp: Float,
     tear: Float,
     clock: Float,
+    breakdown: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
     val brush = remember { ShaderBrush(shader) }
     val ramp = remember { ramp() }
+    val apart = remember { RuntimeShader(breakdownShader) }
     val text = rememberTextMeasurer()
 
     // feeds the fill shader; both fill layers draw the same thing
@@ -183,7 +188,21 @@ private fun Speedometer(
         drawRect(brush, alpha = alpha, blendMode = blendMode)
     }
 
-    Box(modifier) {
+    Box(
+        modifier.graphicsLayer {
+            // past the redline everything on the dial comes apart, scale and needle included;
+            // below it the layer has no effect at all
+            renderEffect = if (breakdown > 0f) {
+                apart.setFloatUniform("center", size.width / 2f, size.height / 2f)
+                apart.setFloatUniform("radius", min(size.width, size.height) * 0.42f)
+                apart.setFloatUniform("k", breakdown)
+                apart.setFloatUniform("time", clock)
+                RenderEffect.createRuntimeShaderEffect(apart, "image").asComposeRenderEffect()
+            } else {
+                null
+            }
+        }
+    ) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(tint, text) }
         // bloom: the same fill, blurred in its own layer

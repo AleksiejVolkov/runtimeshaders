@@ -120,3 +120,81 @@ internal val speedFillShader = """
         return half4(rgb, clamp(max(rgb.r, max(rgb.g, rgb.b)), 0.0, 1.0));
     }
 """
+
+// Past the redline the whole dial starts to come apart. One effect on the dial's layer: the
+// color channels split and tremble, the split direction wanders between the radius and the
+// tangent, short bursts kick in more often towards 240, thin arc bands of the dial slip around
+// the centre, the whole dial shakes by a pixel or two and its brightness flickers. k is 0 at
+// 200 km/h and 1 at 240.
+@Language("AGSL")
+internal val breakdownShader = """
+    uniform shader image;
+    uniform float2 center;
+    uniform float radius;      // px, the rim
+    uniform float k;           // 0..1
+    uniform float time;        // s
+
+    const float TAU = 6.2831853;
+
+    float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+
+    float noise(float t) {
+        float i = floor(t);
+        float f = fract(t);
+        return mix(hash(i), hash(i + 1.0), f * f * (3.0 - 2.0 * f));
+    }
+
+    half4 main(float2 xy) {
+        // already clearly on the edge at 215-221 km/h, still growing towards 240
+        float e = sqrt(k);
+        // time in short slots: a burst or a band lives for one slot
+        float slot = floor(time * 14.0);
+        float burst = step(1.0 - (0.05 + 0.4 * e * e), hash(slot + 7.1));
+
+        // the whole dial shakes a little
+        float shake = 1.2 * e * (1.0 + 1.5 * burst);
+        float2 jitter = float2(noise(time * 31.0), noise(time * 29.0 + 40.0)) - 0.5;
+        float2 p = xy - jitter * 2.0 * shake;
+        float2 d = p - center;
+        float r = length(d);
+
+        // thin arcs of the dial, between two radii and two angles, turn a little for a moment
+        float2 q = p;
+        float inBand = 0.0;
+        for (int i = 0; i < 2; i++) {
+            float seed = slot * 3.0 + float(i) * 17.0;
+            float on = step(1.0 - (0.15 + 0.55 * e) * (0.4 + burst), hash(seed));
+            if (on > 0.5) {
+                float r0 = mix(0.3, 1.08, hash(seed + 1.0)) * radius;
+                float w = mix(0.015, 0.05, hash(seed + 2.0)) * radius;
+                float from = hash(seed + 3.0) * TAU;
+                float span = mix(0.4, 1.4, hash(seed + 4.0));
+                float along = mod(atan(d.y, d.x) - from + TAU, TAU);
+                if (abs(r - r0) < w && along < span) {
+                    float slip = (hash(seed + 5.0) - 0.5) * 0.12 * e;
+                    float c = cos(slip);
+                    float s = sin(slip);
+                    q = center + float2(c * d.x - s * d.y, s * d.x + c * d.y);
+                    inBand = 1.0;
+                }
+            }
+        }
+
+        // the channel split: a tremor and a slow wave; it grows towards the rim
+        float2 radial = d / max(r, 1.0);
+        float2 tangent = float2(-radial.y, radial.x);
+        float phi = 0.8 * sin(time * 1.7) + (noise(time * 23.0) - 0.5) * 1.2;
+        float2 dir = radial * cos(phi) + tangent * sin(phi);
+        // steady part stays under ~3.7 px, thinner than the strokes of the numbers
+        float amount = e * (2.6 + 0.6 * sin(time * 2.3) + (noise(time * 37.0) - 0.5) * 1.0);
+        amount += burst * e * 4.0;
+        amount *= mix(0.4, 1.0, clamp(r / radius, 0.0, 1.0)) * (1.0 + inBand * 2.0);
+        float2 o = dir * amount;
+
+        half4 g = image.eval(q);
+        half4 red = image.eval(q + o);
+        half4 blue = image.eval(q - o);
+        float flicker = 1.0 + e * 0.1 * (noise(time * 19.0) - 0.5) * 2.0 - burst * e * 0.08;
+        return half4(half3(red.r, g.g, blue.b) * flicker, max(g.a, max(red.a, blue.a)));
+    }
+"""
