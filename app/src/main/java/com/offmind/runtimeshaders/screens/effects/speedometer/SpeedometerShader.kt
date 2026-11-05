@@ -18,6 +18,7 @@ internal val speedFillShader = """
     const float width = 0.3;    // of the band of smoke, in rims
     const float stretch = 2.0;  // wisps drawn out along the arc
     const float tear = 1.7;     // depth of the torn inner edge, as a share of the width
+    const float warp = 2.0;     // how far one noise pushes the other
     const float3 COLOR = float3(0.023, 0.044, 0.745); // #2A3BE0 in linear light
 
     float hash(float2 p) {
@@ -48,6 +49,11 @@ internal val speedFillShader = """
         return value;
     }
 
+    // two octaves: enough to push the coordinates of another noise
+    float fbm2(float2 p) {
+        return (noise(p) + 0.5 * noise(p * 2.03 + float2(17.1, 3.7))) / 1.5 * 0.9375;
+    }
+
     half4 main(float2 xy) {
         float2 d = xy - center;
         float r = length(d) / radius;
@@ -65,8 +71,10 @@ internal val speedFillShader = """
 
         // both coordinates in rims, so one frequency means round wisps
         float2 p = float2(along * MIDDLE / stretch * 6.0 - time * 1.6, r * 6.0);
-        float coarse = fbm(p);
-        float fine = fbm(p * 2.6 + 5.3);
+        // domain warping: one noise moves the coordinates of the other
+        float2 q = float2(fbm2(p + time * 0.15), fbm2(p + float2(5.2, 1.3) - time * 0.12));
+        float coarse = fbm(p + warp * q);
+        float fine = fbm(p * 2.6 + warp * 2.0 * q + 5.3);
 
         // the inner edge is torn by the smoke, the outer one is clean
         float edge = 1.0 - width * (1.0 - (coarse - 0.5) * tear - (fine - 0.5) * 0.2);
