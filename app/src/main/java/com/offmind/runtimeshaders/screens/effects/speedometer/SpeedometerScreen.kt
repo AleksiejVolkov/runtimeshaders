@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,9 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -50,6 +53,7 @@ import kotlin.math.sin
 // 150° → 390°.
 private const val StartDeg = 150f
 private const val SweepDeg = 240f
+private const val InnerBand = 0.7f
 private const val RedlineFrom = 200f
 private val Redline = Color(0xFFFF3020) // where the scale ends
 private val Tint = Color(0xFF2A3BE0)
@@ -129,11 +133,23 @@ private fun Speedometer(
     fill: Float,
     modifier: Modifier,
 ) {
+    val shader = remember { RuntimeShader(speedFillShader) }
+    val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
+    fun DrawScope.drawFill() {
+        shader.setFloatUniform("center", center.x, center.y)
+        shader.setFloatUniform("radius", dialRadius())
+        shader.setFloatUniform("inner", InnerBand)
+        shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
+        shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
+        shader.setFloatUniform("fill", fill)
+        drawRect(brush, blendMode = BlendMode.Plus)
+    }
 
     Box(modifier) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(Tint, text) }
+        Canvas(Modifier.matchParentSize()) { drawFill() }
         // scale, labels, redline, needle and the number stay crisp and white over the fill
         Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, text) }
     }
