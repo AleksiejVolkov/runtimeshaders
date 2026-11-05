@@ -71,12 +71,15 @@ fun timeOfSpeed(speed: Float): Float {
     return hi
 }
 
-// The fill follows the speed on a critically damped spring, so it lags behind the number.
+// What accumulates over time. The fill follows the speed on a critically damped spring, so it
+// lags behind the number. The flow is a sum of rate * dt, not time * rate: the rate changes
+// with speed, and a product would send the whole smoke rushing whenever the speed changes.
 private const val Stiffness = 16f // rad/s: about 120 at 126 km/h and 165 at 170
 private const val Step = 1f / 240f
 
 class Launch {
     var fill = 0f
+    var flow = 0f
     private var velocity = 0f
     private var left = 0f
 
@@ -87,12 +90,14 @@ class Launch {
             val a = Stiffness * Stiffness * (target - fill) - 2f * Stiffness * velocity
             velocity += a * Step
             fill += velocity * Step
+            flow += flowRate(fill) * Step
         }
     }
 
     // Where everything would be at [t] of the scenario: the same frame every time.
     fun seek(t: Float) {
         fill = 0f
+        flow = 0f
         velocity = 0f
         left = 0f
         var time = 0f
@@ -102,3 +107,18 @@ class Launch {
         }
     }
 }
+
+// One number drives the smoke: the fill speed, as a share of the whole scale.
+private fun share(speed: Float) = (speed / MaxSpeed).coerceIn(0f, 1f)
+
+// How fast the smoke runs along the arc, in noise cells per second.
+fun flowRate(speed: Float) = 0.25f + 3.2f * share(speed)
+
+// How much the wisps are drawn out along the arc.
+fun stretchAt(speed: Float) = 1f + 3f * share(speed) * share(speed)
+
+// How far one noise pushes the coordinates of the other.
+fun warpAt(speed: Float) = 1.2f + 1.6f * share(speed)
+
+// How deep the inner edge is torn, in rims.
+fun tearAt(speed: Float) = 0.1f + 0.14f * share(speed)

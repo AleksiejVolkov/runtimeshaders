@@ -12,6 +12,10 @@ internal val speedFillShader = """
     uniform float startAngle;  // radians, where 0 km/h is; angles grow clockwise on screen
     uniform float sweep;       // radians from 0 to 240 km/h
     uniform float fill;        // 0..1 of the sweep
+    uniform float flow;        // accumulated: how far the smoke has moved along the arc
+    uniform float stretch;     // >= 1: wisps drawn out along the arc
+    uniform float warp;        // how far one noise pushes the other
+    uniform float tear;        // depth of the torn inner edge, in rims
     uniform float time;        // s
 
     const float TAU = 6.2831853;
@@ -67,14 +71,14 @@ internal val speedFillShader = """
         if (front <= 0.0) return half4(0.0);
 
         // both coordinates in rims, so one frequency means round wisps
-        float2 p = float2(along * MIDDLE * 6.0 - time * 0.9, r * 6.0);
+        float2 p = float2(along * MIDDLE / stretch * 6.0 - flow, r * 6.0);
         // domain warping: one noise moves the coordinates of the other
         float2 q = float2(fbm2(p + time * 0.15), fbm2(p + float2(5.2, 1.3) - time * 0.12));
-        float coarse = fbm(p + 2.0 * q);
-        float fine = fbm(p * 2.6 + 4.0 * q + 5.3);
+        float coarse = fbm(p + warp * q);
+        float fine = fbm(p * 2.6 + warp * 2.0 * q + 5.3);
 
         // the inner edge is torn by the smoke, the outer one is clean
-        float edge = inner + (coarse - 0.5) * 0.5 + (fine - 0.5) * 0.06;
+        float edge = inner + (coarse - 0.5) * tear * 3.0 + (fine - 0.5) * 0.06;
         float band = smoothstep(edge - 0.01, edge + 0.05, r);
         float rim = smoothstep(1.005, 0.985, r);
         float strength = band * rim * front;

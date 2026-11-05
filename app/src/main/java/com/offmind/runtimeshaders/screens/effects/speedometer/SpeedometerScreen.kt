@@ -64,6 +64,7 @@ fun SpeedometerScreen() {
     var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     val launch = remember { Launch() }
     var fill by remember { mutableFloatStateOf(0f) }
+    var flow by remember { mutableFloatStateOf(0f) }
     var playing by remember { mutableStateOf(true) }
     var frozen by remember { mutableStateOf(false) } // the same moment, for comparisons
     var controls by remember { mutableStateOf(true) } // tap the screen: a clean frame
@@ -84,6 +85,7 @@ fun SpeedometerScreen() {
                     }
                     launch.advance(speedAt(time), dt)
                     fill = launch.fill
+                    flow = launch.flow
                 }
                 last = now
             }
@@ -96,6 +98,7 @@ fun SpeedometerScreen() {
         time = timeOfSpeed(target.toFloat())
         launch.seek(time)
         fill = launch.fill
+        flow = launch.flow
         clock = 10f + time
     }
 
@@ -111,6 +114,10 @@ fun SpeedometerScreen() {
         Speedometer(
             speed = speed,
             fill = fill / MaxSpeed,
+            flow = flow,
+            stretch = stretchAt(fill),
+            warp = warpAt(fill),
+            tear = tearAt(fill),
             clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
@@ -140,6 +147,10 @@ fun SpeedometerScreen() {
 private fun Speedometer(
     speed: Float,
     fill: Float,
+    flow: Float,
+    stretch: Float,
+    warp: Float,
+    tear: Float,
     clock: Float,
     modifier: Modifier,
 ) {
@@ -153,6 +164,10 @@ private fun Speedometer(
         shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
+        shader.setFloatUniform("flow", flow)
+        shader.setFloatUniform("stretch", stretch)
+        shader.setFloatUniform("warp", warp)
+        shader.setFloatUniform("tear", tear)
         shader.setFloatUniform("time", clock)
         drawRect(brush, blendMode = BlendMode.Plus)
     }
