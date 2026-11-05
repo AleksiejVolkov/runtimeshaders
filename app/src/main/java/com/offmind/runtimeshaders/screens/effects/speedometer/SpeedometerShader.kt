@@ -144,11 +144,12 @@ internal val breakdownShader = """
     }
 
     half4 main(float2 xy) {
-        // time in short slots: a burst or a band lives for one slot. Half of the slots burst as
-        // soon as k leaves zero, so the kick usually comes right at the redline, though a run of
-        // slots can still miss it. Only the size of a burst grows with k
+        // time in short slots: a burst or a band lives for one slot. The chance is a curve too:
+        // 1 just past the redline, so every launch kicks right at the line, then half of the
+        // slots. Only the size of a burst grows with k
         float slot = floor(time * 14.0);
-        float burst = step(1.0 - 0.5 * smoothstep(0.0, 0.15, k), hash(slot + 7.1));
+        float chance = mix(1.0, 0.5, smoothstep(0.36, 0.5, k));
+        float burst = step(1.0 - chance, hash(slot + 7.1));
 
         // the whole dial shakes a little
         float shake = 2.4 * k * (1.0 + 1.5 * burst);
