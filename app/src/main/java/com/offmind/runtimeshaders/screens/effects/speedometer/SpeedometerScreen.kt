@@ -1,5 +1,6 @@
 package com.offmind.runtimeshaders.screens.effects.speedometer
 
+import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,9 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -129,11 +132,22 @@ private fun Speedometer(
     fill: Float,
     modifier: Modifier,
 ) {
+    val shader = remember { RuntimeShader(speedFillShader) }
+    val brush = remember { ShaderBrush(shader) }
     val text = rememberTextMeasurer()
+    fun DrawScope.drawFill() {
+        shader.setFloatUniform("center", center.x, center.y)
+        shader.setFloatUniform("radius", dialRadius())
+        shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
+        shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
+        shader.setFloatUniform("fill", fill)
+        drawRect(brush, blendMode = BlendMode.Plus)
+    }
 
     Box(modifier) {
         // the hub sits under everything
         Canvas(Modifier.matchParentSize()) { drawHub(Tint, text) }
+        Canvas(Modifier.matchParentSize()) { drawFill() }
         // scale, labels, redline, needle and the number stay crisp and white over the fill
         Canvas(Modifier.matchParentSize()) { drawDial(speed, fill, text) }
     }
