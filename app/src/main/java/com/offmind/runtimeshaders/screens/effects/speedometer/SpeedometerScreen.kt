@@ -60,17 +60,20 @@ private val Tint = Color(0xFF2A3BE0)
 @Composable
 fun SpeedometerScreen() {
     var time by remember { mutableFloatStateOf(0f) } // scenario time
+    var clock by remember { mutableFloatStateOf(0f) } // keeps the smoke moving even on pause
     val launch = remember { Launch() }
     var fill by remember { mutableFloatStateOf(0f) }
     var playing by remember { mutableStateOf(true) }
+    var frozen by remember { mutableStateOf(false) } // the same moment, for comparisons
     var controls by remember { mutableStateOf(true) } // tap the screen: a clean frame
 
     LaunchedEffect(Unit) {
         var last = 0L
         while (true) {
             withFrameNanos { now ->
-                if (last != 0L) {
+                if (last != 0L && !frozen) {
                     val dt = (now - last) / 1e9f
+                    clock += dt
                     if (playing) {
                         time += dt
                         if (time > ScenarioLength) {
@@ -92,6 +95,7 @@ fun SpeedometerScreen() {
         time = timeOfSpeed(target.toFloat())
         launch.seek(time)
         fill = launch.fill
+        clock = 10f + time
     }
 
     val speed = speedAt(time)
@@ -106,6 +110,7 @@ fun SpeedometerScreen() {
         Speedometer(
             speed = speed,
             fill = fill / MaxSpeed,
+            clock = clock,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(1f),
         )
         if (controls) Column(
@@ -117,11 +122,15 @@ fun SpeedometerScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Chip(if (playing) "pause" else "play") { playing = !playing }
+                Chip(if (playing) "pause" else "play") {
+                    playing = !playing
+                    if (playing) frozen = false
+                }
                 listOf(63, 112, 170, 215, 240).forEach { target ->
                     Chip("$target") { seek(target) }
                 }
             }
+            Chip(if (frozen) "frozen" else "freeze") { frozen = !frozen }
         }
     }
 }
@@ -130,6 +139,7 @@ fun SpeedometerScreen() {
 private fun Speedometer(
     speed: Float,
     fill: Float,
+    clock: Float,
     modifier: Modifier,
 ) {
     val shader = remember { RuntimeShader(speedFillShader) }
@@ -141,6 +151,7 @@ private fun Speedometer(
         shader.setFloatUniform("startAngle", Math.toRadians(StartDeg.toDouble()).toFloat())
         shader.setFloatUniform("sweep", Math.toRadians(SweepDeg.toDouble()).toFloat())
         shader.setFloatUniform("fill", fill)
+        shader.setFloatUniform("time", clock)
         drawRect(brush, blendMode = BlendMode.Plus)
     }
 
